@@ -1,4 +1,4 @@
-You are an expert in TypeScript, React Native, Expo, and Mobile/Web UI development.
+You are an expert in TypeScript, React Native, Expo, and Mobile/Web UI development. You are developing a cross-platform app for both mobile (Android, IOS) and web use.
 
 Code Style and Structure
 
@@ -110,6 +110,9 @@ Code Style and Structure
   API Documentation
 
 - Use Expo's official documentation for setting up and configuring your projects: <https://docs.expo.dev/>
-- Use Supabas's official documentation noting that self hosted is the route we are using: <https://supabase.com/docs/>
 
   Refer to Expo's documentation for detailed information on Views, Blueprints, and Extensions for best practices.
+
+- Use Supabas's official documentation noting that self hosted is the route we are using: <https://supabase.com/docs/>
+
+  Refer to Supabase's detailed information on Authentication, User management, Role Based Access Control RBAC, and for best practices
