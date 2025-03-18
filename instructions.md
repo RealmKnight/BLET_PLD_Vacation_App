@@ -1,74 +1,211 @@
-# Project Overview
+# **Project Requirements Document (PRD)**
 
-You are building an Expo react native app for Android, IOS, and web where BLET Union members can request scheduling of their Personal Leave Days (PLDs) and Single Vacation Days (SVDs) and also in the future manage their week-long vacation bids as well.
+## **Project Overview**
 
-You will be using Expo SDK 52, react native, NativeWind for styling, shadcn/ui inspired react-native-reusables, self-hosted supabase (for authentication, RBAC, File Storage, etc), and a coolify deployment server
+You are building an Expo React Native application for **Android, iOS, and web** that enables **BLET Union members** to request scheduling for **Personal Leave Days (PLDs)** and **Single Vacation Days (SVDs)**. Future iterations will include managing **week-long vacation bids** and expanding to support website functionality.
 
-# Core Functionalities
+## **Technology Stack**
 
-1. Role Based Access Control (RBAC) - User Roles are as follows;
-   Application Admin - will be able to do all functions in the app and will have access to an app application dashboard to administer necessary functions.
-   Union Admin - will be able to administer all upper level Union functions like adding/removing Divisions from the Union dashboard and all functions of Division Admins and users.
-   Division Admin - will be able to administer all functions within the particular division there are assigned an admin of and will have a dashboard for doing so and will be able to acess everything a user can.
-   Company Admin - will ONLY have access to company dashboard and will enter requests from the app to company program and mark requests in the app completed when done. They will receive both scheduling and cancelations. Priority will be given to those requests closest to the current day. Will not have a user dashboard nor access to user areas.
-   users - will have acess to personal profile to edit/update information and can requests days to be scheduled and weeks for vacation using the calendars for the division they are a member of
-   <https://supabase.com/docs/guides/database/postgres/custom-claims-and-role-based-access-control-rbac#create-auth-hook-to-apply-user-role>
-   <https://supabase.com/docs/guides/storage/schema/custom-roles>
-   <https://supabase.com/docs/guides/auth/auth-hooks#local-development>
+- **Framework**: Expo SDK 52, React Native
+- **Styling**: NativeWind
+- **UI Components**: Shadcn/ui-inspired react-native-reusables
+- **Backend**: Self-hosted Supabase (Authentication, RBAC, File Storage)
+- **Deployment**: Coolify
 
-2. Divisions - these are the following divisions in the CN/WC GCA of the BLET
-   163 - Proctor, MN
-   173 - Fon Du Lac, WI
-   174 - Stevens Point, WI
-   175 - Neenah, WI
-   184 - Schiller Park, IL
-   185 - Gladstone, MI
-   188 - Superior, WI
-   209 - Green Bay, WI
-   520 - Joliet, IL
+---
 
-3. Division Officers - Following division officer positions can be assigned by the Division Admin
-   President (Required)
-   Vice-President (Required)
-   Secretary/Treasurer (Required)
-   Alternate Secretary/Treasurer (Required)
-   Legislative Representative (Required)
-   Alternate Legislatvie Representative (Required)
-   Local Chairman (Required)
-   First Vice-Local Chairman (Required)
-   Second Vice-Local Chairman (Required)
-   Third Vice-Local Chairman
-   Forth Vice-Local Chairman
-   Fifth Vice-Local Chairman
-   Guide (Required)
-   Chaplain (Required)
-   Delegate to the National Division (Required)
-   First Alternate Delegate to the National Division (Required)
-   Second Alternate Delegate to the National Division (Required)
-   First Trustee (Required)
-   Second Trustee (Required)
-   Third Trustee (Required)
-   First Alternate Trustee (Required)
-   Second Alternate Trustee (Required)
-   Third Alternate Trustee (Required)
+## **Core Functionalities**
 
-4. Calendars
-   Each Division will have 2 seperate calendars one for PLDs/SDVs and one for full week vacations.
-   The PLD/SDV Calendar will have several views available (week, Day, Month, etc) and each days will display the number of spots available to be scheduled on that day or "waitlist" if the day is currenlty fully scheduled. The daily allotment of spots available will be administered by the division admin in the division dashboard
-   The full week vacation calendar will be similar to the PLD/SDV calendar except that it will not have a daily view
+### **1. Role-Based Access Control (RBAC)**
 
-5. My Time
-   Each member will have a tab called "My Time" that displays the number of PLDs and SDVs with a table rows as follows - Total, Available, Requested, Waitlisted, Approved, Paid in Lieu. below this chart will be a list of Approved Requests with Submission timestamp, Requested Date, Time off type, and approved timestamp columns (Displaying "No Requests currently approved" if the member has none). Below this will be a list of Time off requests with submission timestamp, requested Date, Time off type columns (Displaying "You have no Requests submitted" if the member has none). Below that will be a list of Waitlisted Requests with Requested date, waitlist position, and time off type columns (Displaying "You aren't on any waitlists" if the member has none).
+User roles and permissions are strictly defined and stored in the **Supabase members table** (not overriding built-in auth roles). A Supabase hook will automatically assign **new members as users**.
 
-6. News/Notifications
-   There will be a News/Notifications section where Union Admins and Division Admins can post News for members. Some of these news/Notifications will be "Must Read" items and must be read/acknowledged before the member can continue to a different section in the app. A member will always be able to go to their Notifications/News area and read past notices/News though. News/Notifications can be sent just to members of a particular division by the Division Admin or they can be sent to the whole membership by a Union Admin. Division Admins can also message other division Admins and Union Admins as needed. A user can also message the Division Admin of the division they are assigned to. The person who makes the news notiification can set a display date and timeframe for the message to last.
+| Role                  | Permissions                                                                                        |
+| --------------------- | -------------------------------------------------------------------------------------------------- |
+| **Application Admin** | Full access to all functions, including administrative dashboard controls.                         |
+| **Union Admin**       | Manages union-level functions, including adding/removing divisions and overseeing division admins. |
+| **Division Admin**    | Administers a specific division, including managing schedules, user roles, and approvals.          |
+| **Company Admin**     | Processes and marks leave requests as completed. Only accesses company dashboard, not user areas.  |
+| **User**              | Can edit their profile, submit requests for PLDs, SVDs, and week-long vacation scheduling.         |
 
-7.
+> **Implementation Notes:**
+>
+> - Roles are stored in the **Supabase members table**.
+> - A Supabase auth hook will automatically assign **new members** as users.
+> - Roles do not override **Supabase’s built-in auth roles**.
 
-# Doc
+### **2. Divisions**
 
-xxxx
+The **CN/WC GCA of the BLET** includes the following divisions:
 
-# Curent file structure
+- **163** - Proctor, MN
+- **173** - Fond Du Lac, WI
+- **174** - Stevens Point, WI
+- **175** - Neenah, WI
+- **184** - Schiller Park, IL
+- **185** - Gladstone, MI
+- **188** - Superior, WI
+- **209** - Green Bay, WI
+- **520** - Joliet, IL
 
-xxxx
+> **Implementation Notes:**
+>
+> - Each user is assigned to a **single division**.
+> - Each division has **its own set of officers and calendars**.
+
+### **3. Division Officers**
+
+Each division may assign the following **officer positions**, managed by the **Division Admin**:
+
+- **Required Positions:** President, Vice-President, Secretary/Treasurer, Alternate Secretary/Treasurer, Legislative Representative, Alternate Legislative Representative, Local Chairman, First Vice-Local Chairman, Second Vice-Local Chairman, Guide, Chaplain, Delegate to the National Division, First Alternate Delegate to the National Division, Second Alternate Delegate to the National Division, First Trustee, Second Trustee, Third Trustee, First Alternate Trustee, Second Alternate Trustee, Third Alternate Trustee.
+- **Optional Positions:** Third Vice-Local Chairman, Fourth Vice-Local Chairman, Fifth Vice-Local Chairman.
+
+> **Implementation Notes:**
+>
+> - Officer roles will be stored in the **members table**.
+> - Assignments are managed in the **Division Admin dashboard**.
+
+### **4. Calendars**
+
+#### **PLD/SDV Calendar**
+
+Each division maintains a **Personal Leave Day (PLD) and Single Vacation Day (SVD) Calendar**, displaying availability with **color-coded status**:
+
+- **Grey** - Past dates (not selectable).
+- **Red** - Next 2 days (requests locked).
+- **Green** - Future dates (open for requests, 2+ spots available).
+- **Yellow** - Limited availability (1-2 spots left).
+- **Red** - Fully booked, waitlist option available.
+
+> **Implementation Notes:**
+>
+> - **Daily availability quotas** are managed by **Division Admins**.
+> - Users can submit **waitlist requests** for fully booked days.
+
+#### **Full-Week Vacation Calendar**
+
+- Users **submit vacation preferences** through the app.
+- **Auto-scheduling** fills available slots until **Division Admin approval**.
+- Vacation follows **seniority-based assignment** rules.
+- Vacation periods can **span across years** (e.g., December 30 - January 5).
+
+> **Implementation Notes:**
+>
+> - Admins can override **automatic scheduling**.
+> - Division Admins manage **final vacation approvals**.
+
+### **5. My Time**
+
+Each user has a **"My Time" dashboard** displaying:
+
+- **PLD/SVD Balance**: Total, Available, Requested, Waitlisted, Approved, Paid in Lieu.
+- **Approved Requests List**: Submission timestamp, Requested Date, Type, Approval timestamp.
+- **Pending Requests List**: Submission timestamp, Requested Date, Type.
+- **Waitlisted Requests**: Position, Date, Type.
+
+> **Implementation Notes:**
+>
+> - Data is fetched from **Supabase tables** for live tracking.
+
+### **6. News & Notifications**
+
+Admins can post **news updates & notifications**:
+
+- **Union Admins** can send to **all members**.
+- **Division Admins** can send to their **division members**.
+- **Admins can communicate privately**.
+- Some messages require **acknowledgment** before users can continue.
+
+> **Implementation Notes:**
+>
+> - Messages have **start/end display dates**.
+
+### **7. Future Expansion**
+
+Planned **website integration**:
+
+- Forms
+- Tools
+- Links
+- Additional union resources
+
+---
+
+## **File Structure**
+
+```
+├──.expo
+│ ├──types
+│ └──web
+│ └──cache
+├── app
+│ ├── (tabs) # Main tab-based navigation
+│ │ ├── index.tsx # Home Screen (default route)
+│ │ ├── calendar.tsx # PLD/SDV & Vacation Calendar
+│ │ ├── my-time.tsx # User's Time Off Overview
+│ │ ├── notifications.tsx # News/Notifications
+│ │ ├── profile.tsx # User Profile
+│ │ ├── admin # Admin Dashboard (nested routes)
+│ │ │ ├── index.tsx # Admin Dashboard Home
+│ │ │ ├── division.tsx # Division Management
+│ │ │ ├── requests.tsx # Requests Management
+│ │ │ └── users.tsx # User Management
+│ │ ├── auth # Authentication & Onboarding
+│ │ │ ├── login.tsx
+│ │ │ ├── register.tsx
+│ │ │ └── forgot-password.tsx
+│ │ ├── settings.tsx # App Settings
+│ │ └── (modals) # Modals for actions (optional)
+│ ├── request-modal.tsx # Request Leave Modal
+│ ├── notification-modal.tsx # View News Details
+│ ├── admin-action-modal.tsx # Admin Approval Modal
+├── components # Reusable UI Components
+│ ├── ui # Shared UI Elements (Buttons, Modals, Inputs, etc.)
+│ ├── calendar # Custom Calendar Components
+│ ├── my-time # My Time Dashboard Components
+│ ├── notifications # Notification Components
+│ └── admin # Admin-Specific UI Components
+├── services # API Calls & Business Logic
+│ ├── auth.ts # Authentication API
+│ ├── calendar.ts # Calendar API
+│ ├── requests.ts # Leave Requests API
+│ ├── notifications.ts # Notifications API
+│ ├── user.ts # User Profile API
+│ ├── admin.ts # Admin Functions API
+├── store # State Management (if needed)
+│ ├── index.ts # Store Initialization
+│ ├── authStore.ts # Auth State Management
+│ ├── calendarStore.ts # Calendar State Management
+│ ├── requestStore.ts # Leave Requests State
+│ ├── notificationStore.ts # Notifications State
+├── constants # App-Wide Constants & Config
+│ ├── roles.ts # Role-Based Access Constants
+│ ├── colors.ts # Color Scheme (Calendar Colors, UI Theme)
+│ ├── api.ts # API Endpoints
+│ ├── permissions.ts # User Permissions
+├── hooks # Custom Hooks
+│ ├── useAuth.ts # Auth Hook
+│ ├── useCalendar.ts # Calendar Hook
+│ ├── useNotifications.ts # Notification Hook
+│ ├── useRequests.ts # Leave Requests Hook
+├── assets # Static Assets
+│ ├── fonts
+│ ├── images
+│ ├── icons
+├── scripts # Utility Scripts
+│ ├── seedDatabase.ts # Seed Supabase Data
+│ ├── syncRoles.ts # Sync RBAC Roles
+│ ├── cronJobs.ts # Future Task Automation
+├── app.config.ts # Expo App Configuration
+└── README.md
+```
+
+---
+
+## **Documentation & References**
+
+- [Supabase Custom Claims & RBAC](https://supabase.com/docs/guides/database/postgres/custom-claims-and-role-based-access-control-rbac#create-auth-hook-to-apply-user-role)
+- [Supabase Storage Schema & Roles](https://supabase.com/docs/guides/storage/schema/custom-roles)
+- [Supabase Auth Hooks](https://supabase.com/docs/guides/auth/auth-hooks#local-development)
+
+---
