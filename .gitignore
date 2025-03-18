@@ -62,3 +62,4 @@ google-services.json
 
 # Custom
 app-example
+.env

@@ -2,7 +2,7 @@
 
 You are building an Expo react native app for Android, IOS, and web where BLET Union members can request scheduling of their Personal Leave Days (PLDs) and Single Vacation Days (SVDs) and also in the future manage their week-long vacation bids as well.
 
-You will be using Expo SDK 52, react native, self-hosted supabase (for authentication, RBAC, File Storage, etc), and a coolify deployment server
+You will be using Expo SDK 52, react native, NativeWind for styling, shadcn/ui inspired react-native-reusables, self-hosted supabase (for authentication, RBAC, File Storage, etc), and a coolify deployment server
 
 # Core Functionalities
 
