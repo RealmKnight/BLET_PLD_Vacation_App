@@ -123,3 +123,16 @@ export async function updateProfile(updates: Partial<Database["public"]["Tables"
 
   if (error) throw new AuthError(error.message);
 }
+
+export async function updateUserPhone(phoneNumber: string) {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new AuthError("No user found");
+
+  const { error } = await supabase.auth.updateUser({
+    phone: phoneNumber,
+  });
+
+  if (error) throw new AuthError(error.message);
+}

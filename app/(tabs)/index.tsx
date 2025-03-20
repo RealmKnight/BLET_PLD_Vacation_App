@@ -1,6 +1,7 @@
-import { StyleSheet, TouchableOpacity, View, ScrollView, useWindowDimensions } from "react-native";
+import { StyleSheet, TouchableOpacity, View, ScrollView, useWindowDimensions, Platform } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import { HelloWave } from "@/components/HelloWave";
 import { ThemedText } from "@/components/ThemedText";
@@ -17,9 +18,13 @@ export default function HomeScreen() {
   const handleLogout = async () => {
     try {
       await signOut();
-      router.replace("/(auth)/login");
     } catch (error) {
       console.error("Error signing out:", error);
+      // Even if signOut fails, we still want to redirect to login
+      // This handles cases where the session is already invalid
+    } finally {
+      // Always redirect to login, regardless of signOut success
+      router.replace("/(auth)/login");
     }
   };
 
@@ -32,7 +37,7 @@ export default function HomeScreen() {
   };
 
   const handleMyTime = () => {
-    router.push("/my-time" as any);
+    router.push("/mytime" as any);
   };
 
   const handleNotifications = () => {
@@ -40,82 +45,105 @@ export default function HomeScreen() {
   };
 
   return (
-    <ThemedView style={styles.container}>
-      <View style={styles.fixedHeader}>
-        <View style={[styles.headerButtons, isMobile && styles.headerButtonsMobile]}>
-          <TouchableOpacity onPress={handleProfile} style={styles.headerButton}>
-            <Ionicons name="person-circle-outline" size={24} color="#BAC42A" />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={handleLogout} style={styles.headerButton}>
-            <Ionicons name="log-out-outline" size={24} color="#BAC42A" />
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      <ScrollView style={styles.scrollView}>
-        <ThemedView style={[styles.container, isMobile && styles.containerMobile]}>
-          <View style={styles.headerContainer}>
-            <View style={styles.header}>
-              <AuthHeader />
-            </View>
+    <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
+      <ThemedView style={styles.container}>
+        <View style={styles.fixedHeader}>
+          <View style={[styles.headerButtons, isMobile && styles.headerButtonsMobile]}>
+            <TouchableOpacity onPress={handleProfile} style={styles.headerButton}>
+              <Ionicons name="person-circle-outline" size={24} color="#BAC42A" />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={handleLogout} style={styles.headerButton}>
+              <Ionicons name="log-out-outline" size={24} color="#BAC42A" />
+            </TouchableOpacity>
           </View>
+        </View>
 
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
           <ThemedView style={[styles.content, isMobile && styles.contentMobile]}>
+            <View style={styles.headerContainer}>
+              <View style={styles.header}>
+                <AuthHeader />
+              </View>
+            </View>
+
             <ThemedView style={styles.welcomeContainer}>
-              <ThemedText type="title" style={styles.welcomeText}>
+              <ThemedText type="title" style={[styles.welcomeText, isMobile && styles.welcomeTextMobile]}>
                 Welcome, {member?.first_name}!
               </ThemedText>
               <HelloWave />
             </ThemedView>
 
-            <ThemedView style={styles.featuresGrid}>
-              <TouchableOpacity style={styles.featureCard} onPress={handleCalendar}>
+            <ThemedView style={[styles.featuresGrid, isMobile && styles.featuresGridMobile]}>
+              <TouchableOpacity
+                style={[styles.featureCard, isMobile && styles.featureCardMobile]}
+                onPress={handleCalendar}
+              >
                 <Ionicons name="calendar-outline" size={32} color="#BAC42A" />
                 <ThemedText type="subtitle" style={styles.featureTitle}>
                   Calendar
                 </ThemedText>
-                <ThemedText style={styles.featureDescription}>View and request PLDs, SVDs, and vacations</ThemedText>
+                <ThemedText style={[styles.featureDescription, isMobile && styles.featureDescriptionMobile]}>
+                  View and request PLDs, SVDs, and vacations
+                </ThemedText>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.featureCard} onPress={handleMyTime}>
+              <TouchableOpacity
+                style={[styles.featureCard, isMobile && styles.featureCardMobile]}
+                onPress={handleMyTime}
+              >
                 <Ionicons name="time-outline" size={32} color="#BAC42A" />
                 <ThemedText type="subtitle" style={styles.featureTitle}>
                   My Time
                 </ThemedText>
-                <ThemedText style={styles.featureDescription}>Track your time off and requests</ThemedText>
+                <ThemedText style={[styles.featureDescription, isMobile && styles.featureDescriptionMobile]}>
+                  Track your time off and requests
+                </ThemedText>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.featureCard} onPress={handleNotifications}>
+              <TouchableOpacity
+                style={[styles.featureCard, isMobile && styles.featureCardMobile]}
+                onPress={handleNotifications}
+              >
                 <Ionicons name="notifications-outline" size={32} color="#BAC42A" />
                 <ThemedText type="subtitle" style={styles.featureTitle}>
                   Notifications
                 </ThemedText>
-                <ThemedText style={styles.featureDescription}>Stay updated with union news and alerts</ThemedText>
+                <ThemedText style={[styles.featureDescription, isMobile && styles.featureDescriptionMobile]}>
+                  Stay updated with union news and alerts
+                </ThemedText>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.featureCard} onPress={handleProfile}>
+              <TouchableOpacity
+                style={[styles.featureCard, isMobile && styles.featureCardMobile]}
+                onPress={handleProfile}
+              >
                 <Ionicons name="person-outline" size={32} color="#BAC42A" />
                 <ThemedText type="subtitle" style={styles.featureTitle}>
                   Profile
                 </ThemedText>
-                <ThemedText style={styles.featureDescription}>Manage your account and preferences</ThemedText>
+                <ThemedText style={[styles.featureDescription, isMobile && styles.featureDescriptionMobile]}>
+                  Manage your account and preferences
+                </ThemedText>
               </TouchableOpacity>
             </ThemedView>
           </ThemedView>
-        </ThemedView>
-      </ScrollView>
-    </ThemedView>
+        </ScrollView>
+      </ThemedView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: "#000000",
+  },
   container: {
     flex: 1,
-  },
-  containerMobile: {
-    maxWidth: 600,
-    alignSelf: "center",
-    width: "100%",
   },
   fixedHeader: {
     position: "absolute",
@@ -123,8 +151,9 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 1,
-    paddingTop: 20,
-    paddingBottom: 10,
+    paddingTop: Platform.OS === "ios" ? 44 : 24,
+    paddingBottom: 8,
+    backgroundColor: "#000000",
   },
   headerButtons: {
     flexDirection: "row",
@@ -138,10 +167,23 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   headerButton: {
-    padding: 8,
+    padding: 4,
   },
   scrollView: {
     flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingTop: Platform.OS === "ios" ? 80 : 60,
+  },
+  content: {
+    padding: 20,
+    maxWidth: 1200,
+    alignSelf: "center",
+    width: "100%",
+  },
+  contentMobile: {
+    padding: 16,
   },
   headerContainer: {
     paddingTop: 20,
@@ -149,12 +191,6 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: "center",
-  },
-  content: {
-    padding: 20,
-  },
-  contentMobile: {
-    padding: 16,
   },
   welcomeContainer: {
     flexDirection: "row",
@@ -164,12 +200,19 @@ const styles = StyleSheet.create({
   },
   welcomeText: {
     color: "#BAC42A",
+    fontSize: 24,
+  },
+  welcomeTextMobile: {
+    fontSize: 20,
   },
   featuresGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 16,
     justifyContent: "space-between",
+  },
+  featuresGridMobile: {
+    gap: 12,
   },
   featureCard: {
     width: "48%",
@@ -181,13 +224,22 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#BAC42A",
   },
+  featureCardMobile: {
+    width: "100%",
+    padding: 12,
+  },
   featureTitle: {
     color: "#BAC42A",
     textAlign: "center",
+    fontSize: 16,
   },
   featureDescription: {
-    fontSize: 12,
+    fontSize: 14,
     textAlign: "center",
     color: "#FFFFFF",
+    opacity: 0.8,
+  },
+  featureDescriptionMobile: {
+    fontSize: 12,
   },
 });

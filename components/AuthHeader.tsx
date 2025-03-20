@@ -1,4 +1,4 @@
-import { Image, StyleSheet } from "react-native";
+import { Image, StyleSheet, Platform } from "react-native";
 import { ThemedText } from "./ThemedText";
 import { ThemedView } from "./ThemedView";
 
@@ -18,23 +18,22 @@ const styles = StyleSheet.create({
   container: {
     alignItems: "center",
     marginBottom: 40,
+    paddingTop: Platform.OS === "ios" ? 60 : Platform.OS === "android" ? 40 : 20,
   },
   logo: {
     width: 200,
-    height: 130,
+    height: 100,
     resizeMode: "contain",
     marginBottom: 16,
   },
   title: {
     fontSize: 24,
-    color: "#BAC42A",
-    textAlign: "center",
     marginBottom: 8,
+    color: "#BAC42A",
   },
   subtitle: {
     fontSize: 16,
+    opacity: 0.7,
     color: "#FFFFFF",
-    opacity: 0.8,
-    textAlign: "center",
   },
 });

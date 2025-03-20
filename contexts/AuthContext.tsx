@@ -111,10 +111,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // Check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log("Initial session check:", session ? "Session exists" : "No session");
       setUser(session?.user ?? null);
       if (session?.user) {
         fetchMember(session.user.id);
       } else {
+        setMember(null);
+        setNeedsMemberAssociation(false);
         setIsLoading(false);
       }
     });
@@ -123,6 +126,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log("Auth state changed:", event, session ? "Session exists" : "No session");
       setUser(session?.user ?? null);
       if (session?.user) {
         await fetchMember(session.user.id);
@@ -229,13 +233,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = async () => {
     try {
       const { error } = await supabase.auth.signOut();
-      if (error) throw error;
+      if (error) {
+        console.error("Error signing out:", error);
+        // If the session is already invalid, we still want to clear the state
+        if (error.message.includes("Session from session_id claim in JWT does not exist")) {
+          setUser(null);
+          setMember(null);
+          setNeedsMemberAssociation(false);
+          return;
+        }
+        throw error;
+      }
       setUser(null);
       setMember(null);
       setNeedsMemberAssociation(false);
-      router.replace("/(auth)/login");
     } catch (error) {
       console.error("Error signing out:", error);
+      // Even if there's an error, we want to clear the state
+      setUser(null);
+      setMember(null);
+      setNeedsMemberAssociation(false);
       throw error;
     }
   };
