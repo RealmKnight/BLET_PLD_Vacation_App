@@ -6,7 +6,7 @@ import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
 import "react-native-reanimated";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
-import { AppHeader } from "@/components/AppHeader";
+import { LoadingScreen } from "@/components";
 import { useColorScheme } from "@/hooks/useColorScheme";
 import { Platform } from "react-native";
 
@@ -43,29 +43,34 @@ export default function RootLayout() {
 }
 
 function RootLayoutNav() {
-  const { member, isLoading, needsMemberAssociation } = useAuth();
+  const { member, isLoading, needsMemberAssociation, user } = useAuth();
   const colorScheme = useColorScheme();
 
-  console.log("RootLayoutNav state:", {
-    hasMember: !!member,
-    memberData: member,
-    isLoading,
-    needsMemberAssociation,
-  });
+  // Add more detailed logging
+  useEffect(() => {
+    console.log("RootLayoutNav state change:", {
+      hasMember: !!member,
+      hasUser: !!user,
+      memberData: member,
+      isLoading,
+      needsMemberAssociation,
+      platform: Platform.OS,
+      timestamp: new Date().toISOString(),
+    });
+  }, [member, isLoading, needsMemberAssociation, user]);
+
+  if (isLoading) {
+    return <LoadingScreen />;
+  }
 
   return (
     <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
       <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
       <Stack screenOptions={{ headerShown: false }}>
-        {isLoading ? (
-          <Stack.Screen name="(tabs)" options={{ animation: "none" }} />
-        ) : member ? (
-          <Stack.Screen name="(tabs)" options={{ animation: "none" }} />
-        ) : needsMemberAssociation ? (
-          <Stack.Screen name="(member-association)" options={{ animation: "none" }} />
-        ) : (
-          <Stack.Screen name="(auth)" options={{ animation: "none" }} />
-        )}
+        <Stack.Screen name="(auth)" redirect={!!member || (!!user && needsMemberAssociation)} />
+        <Stack.Screen name="(member-association)" redirect={!user || !!member || !needsMemberAssociation} />
+        <Stack.Screen name="(tabs)" redirect={!member} />
+        <Stack.Screen name="index" redirect={true} />
       </Stack>
     </ThemeProvider>
   );

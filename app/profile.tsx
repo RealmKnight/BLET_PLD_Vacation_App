@@ -11,6 +11,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { AuthHeader } from "@/components/AuthHeader";
 import { updateProfile, updateUserPhone } from "@/services/auth";
 import { Database } from "@/types/supabase";
+import { AppHeader } from "@/components/AppHeader";
 
 type Zone = Database["public"]["Enums"]["zone"];
 type Division = Database["public"]["Enums"]["division"];
@@ -131,12 +132,12 @@ export default function ProfileScreen() {
   return (
     <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
       <ThemedView style={styles.container}>
-        <View style={styles.fixedHeader}>
-          <View style={[styles.headerButtons, isMobile && styles.headerButtonsMobile]}>
-            <TouchableOpacity onPress={() => router.back()} style={styles.headerButton}>
-              <Ionicons name="arrow-back-outline" size={24} color="#BAC42A" />
-            </TouchableOpacity>
-            {isEditing ? (
+        <AppHeader
+          showBackButton
+          showAdminButton={false}
+          showLogoutButton={false}
+          customRightButtons={
+            isEditing ? (
               <>
                 <TouchableOpacity onPress={handleCancel} style={styles.headerButton}>
                   <Ionicons name="close-outline" size={24} color="#BAC42A" />
@@ -149,10 +150,9 @@ export default function ProfileScreen() {
               <TouchableOpacity onPress={() => setIsEditing(true)} style={styles.headerButton}>
                 <Ionicons name="pencil-outline" size={24} color="#BAC42A" />
               </TouchableOpacity>
-            )}
-          </View>
-        </View>
-
+            )
+          }
+        />
         <ScrollView
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
@@ -307,30 +307,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  fixedHeader: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 1,
-    paddingTop: Platform.OS === "ios" ? 44 : 24,
-    paddingBottom: 8,
-    backgroundColor: "#000000",
-  },
-  headerButtons: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    gap: 16,
-  },
-  headerButtonsMobile: {
-    paddingHorizontal: 10,
-    gap: 8,
-  },
-  headerButton: {
-    padding: 4,
-  },
   scrollView: {
     flex: 1,
   },
@@ -408,5 +384,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
     textAlign: "center",
+  },
+  headerButton: {
+    padding: 8,
   },
 });

@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { Database } from "@/types/supabase";
 import { User } from "@supabase/supabase-js";
+import { Platform } from "react-native";
 
 type Member = Database["public"]["Tables"]["members"]["Row"];
 
@@ -56,6 +57,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } = await supabase.auth.getSession();
       const currentUser = session?.user || null;
 
+      if (!currentUser) {
+        console.log("No active session found during fetchMember");
+        updateAuthState({
+          user: currentUser,
+          member: member,
+          needsMemberAssociation: needsMemberAssociation,
+          isLoading: false,
+        });
+        return;
+      }
+
       const { data: memberData, error: memberError } = await supabase
         .from("members")
         .select("*")
@@ -66,6 +78,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         memberData,
         hasError: !!memberError,
         errorCode: memberError?.code,
+        platform: Platform.OS,
       });
 
       // Handle network errors first
@@ -132,6 +145,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
+    let mounted = true;
+
     async function initializeAuth() {
       try {
         console.log("Initializing auth state...");
@@ -139,6 +154,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           data: { session },
           error: sessionError,
         } = await supabase.auth.getSession();
+
+        if (!mounted) return;
 
         if (sessionError) {
           console.error("Error getting session:", sessionError);
@@ -154,20 +171,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log("Session check result:", {
           hasSession: !!session,
           userId: session?.user?.id,
-          user: session?.user,
+          platform: Platform.OS,
         });
 
-        if (session?.user) {
-          // Set initial state with user
-          updateAuthState({
-            user: session.user,
-            member: null,
-            needsMemberAssociation: false,
-            isLoading: true,
-          });
-          // Then fetch member data
-          await fetchMember(session.user.id);
-        } else {
+        if (!session?.user) {
           console.log("No active session found, clearing state");
           updateAuthState({
             user: null,
@@ -175,38 +182,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             needsMemberAssociation: false,
             isLoading: false,
           });
+          return;
         }
-      } catch (error) {
-        console.error("Error in initializeAuth:", error);
-        updateAuthState({
-          user: null,
-          member: null,
-          needsMemberAssociation: false,
-          isLoading: false,
-        });
-      }
-    }
 
-    // Start with loading state
-    updateAuthState({
-      user: null,
-      member: null,
-      needsMemberAssociation: false,
-      isLoading: true,
-    });
-    initializeAuth();
-
-    // Set up auth state change listener
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      console.log("Auth state change event:", _event, {
-        hasSession: !!session,
-        userId: session?.user?.id,
-        event: _event,
-      });
-
-      if (session?.user) {
         // Set initial state with user
         updateAuthState({
           user: session.user,
@@ -214,9 +192,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           needsMemberAssociation: false,
           isLoading: true,
         });
+
         // Then fetch member data
         await fetchMember(session.user.id);
-      } else {
+      } catch (error) {
+        console.error("Error in initializeAuth:", error);
+        if (mounted) {
+          updateAuthState({
+            user: null,
+            member: null,
+            needsMemberAssociation: false,
+            isLoading: false,
+          });
+        }
+      }
+    }
+
+    // Initialize auth state
+    initializeAuth();
+
+    // Set up auth state change listener
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (!mounted) return;
+
+      console.log("Auth state change event:", _event, {
+        hasSession: !!session,
+        userId: session?.user?.id,
+        platform: Platform.OS,
+      });
+
+      if (!session?.user) {
         console.log("Auth state change: No session, clearing state");
         updateAuthState({
           user: null,
@@ -224,10 +231,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           needsMemberAssociation: false,
           isLoading: false,
         });
+        return;
       }
+
+      // Set initial state with user
+      updateAuthState({
+        user: session.user,
+        member: null,
+        needsMemberAssociation: false,
+        isLoading: true,
+      });
+
+      // Then fetch member data
+      await fetchMember(session.user.id);
     });
 
     return () => {
+      mounted = false;
       subscription.unsubscribe();
     };
   }, []);

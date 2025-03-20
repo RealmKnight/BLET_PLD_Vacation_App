@@ -8,6 +8,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { useAuth } from "@/contexts/AuthContext";
 import { AuthHeader } from "@/components/AuthHeader";
+import { AppHeader } from "@/components/AppHeader";
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -53,22 +54,7 @@ export default function HomeScreen() {
   return (
     <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
       <ThemedView style={styles.container}>
-        <View style={styles.fixedHeader}>
-          <View style={[styles.headerButtons, isMobile && styles.headerButtonsMobile]}>
-            {isAdmin && (
-              <TouchableOpacity onPress={handleAdmin} style={styles.headerButton}>
-                <Ionicons name="settings-outline" size={24} color="#BAC42A" />
-              </TouchableOpacity>
-            )}
-            <TouchableOpacity onPress={handleProfile} style={styles.headerButton}>
-              <Ionicons name="person-circle-outline" size={24} color="#BAC42A" />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={handleLogout} style={styles.headerButton}>
-              <Ionicons name="log-out-outline" size={24} color="#BAC42A" />
-            </TouchableOpacity>
-          </View>
-        </View>
-
+        <AppHeader />
         <ScrollView
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}

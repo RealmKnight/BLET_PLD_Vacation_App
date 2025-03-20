@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { StyleSheet, TouchableOpacity, View, ScrollView, Platform } from "react-native";
 import { useAuth } from "@/contexts/AuthContext";
 import { ThemedView } from "@/components/ThemedView";
@@ -8,15 +8,23 @@ import { AuthHeader } from "@/components/AuthHeader";
 import { ContactAdmin } from "@/components/ContactAdmin";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useWindowDimensions } from "react-native";
+import { router } from "expo-router";
 
 export default function MemberAssociationScreen() {
-  const { associateMember } = useAuth();
+  const { associateMember, member } = useAuth();
   const [pin, setPin] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [showContactAdmin, setShowContactAdmin] = useState(false);
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
+
+  useEffect(() => {
+    if (member) {
+      console.log("MemberAssociationScreen: Member data detected, redirecting to tabs", { member });
+      router.replace("/(tabs)");
+    }
+  }, [member]);
 
   const handleSubmit = async () => {
     if (!pin) {

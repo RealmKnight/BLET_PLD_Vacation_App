@@ -18,11 +18,10 @@ const styles = StyleSheet.create({
   container: {
     alignItems: "center",
     marginBottom: 40,
-    paddingTop: Platform.OS === "ios" ? 60 : Platform.OS === "android" ? 40 : 20,
   },
   logo: {
     width: 200,
-    height: 100,
+    height: 120,
     resizeMode: "contain",
     marginBottom: 16,
   },
