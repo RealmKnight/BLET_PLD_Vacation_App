@@ -149,6 +149,7 @@ export type Database = {
           role: Database["public"]["Enums"]["role"] | null;
           is_active: boolean | null;
           last_login: string | null;
+          date_of_birth: string | null;
         };
         Insert: {
           id: string;
@@ -167,6 +168,7 @@ export type Database = {
           role?: Database["public"]["Enums"]["role"] | null;
           is_active?: boolean | null;
           last_login?: string | null;
+          date_of_birth?: string | null;
         };
         Update: {
           id?: string;
@@ -185,6 +187,7 @@ export type Database = {
           role?: Database["public"]["Enums"]["role"] | null;
           is_active?: boolean | null;
           last_login?: string | null;
+          date_of_birth?: string | null;
         };
         Relationships: [
           {

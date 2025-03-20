@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { StyleSheet, TouchableOpacity, View, ScrollView, useWindowDimensions, Platform } from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -22,6 +22,24 @@ export default function ProfileScreen() {
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
 
+  // Add debugging logs
+  console.log("Profile Data:", {
+    user: user
+      ? {
+          id: user.id,
+          email: user.email,
+          phone: user.phone,
+        }
+      : null,
+    member: member
+      ? {
+          first_name: member.first_name,
+          last_name: member.last_name,
+          pin_number: member.pin_number,
+        }
+      : null,
+  });
+
   const [isEditing, setIsEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -32,12 +50,31 @@ export default function ProfileScreen() {
   const [pinNumber, setPinNumber] = useState(member?.pin_number?.toString() || "");
   const [email, setEmail] = useState(user?.email || "");
   const [phoneNumber, setPhoneNumber] = useState(user?.phone || "");
+  const [dateOfBirth, setDateOfBirth] = useState(member?.date_of_birth || "");
   const [companyHireDate, setCompanyHireDate] = useState(member?.company_hire_date || "");
   const [engineerDate, setEngineerDate] = useState(member?.engineer_date || "");
   const [division, setDivision] = useState<Division | null>(member?.division || null);
   const [zone, setZone] = useState<Zone | null>(member?.zone || null);
 
   const isAdmin = member?.role !== "user";
+
+  // Add useEffect to update form state when user/member data changes
+  useEffect(() => {
+    if (user) {
+      setEmail(user.email || "");
+      setPhoneNumber(user.phone || "");
+    }
+    if (member) {
+      setFirstName(member.first_name || "");
+      setLastName(member.last_name || "");
+      setPinNumber(member.pin_number?.toString() || "");
+      setDateOfBirth(member.date_of_birth || "");
+      setCompanyHireDate(member.company_hire_date || "");
+      setEngineerDate(member.engineer_date || "");
+      setDivision(member.division || null);
+      setZone(member.zone || null);
+    }
+  }, [user, member]);
 
   const handleSave = async () => {
     setIsLoading(true);
@@ -59,6 +96,7 @@ export default function ProfileScreen() {
           engineer_date: engineerDate,
           division: division,
           zone: zone,
+          date_of_birth: dateOfBirth,
         });
       }
       setIsEditing(false);
@@ -81,6 +119,7 @@ export default function ProfileScreen() {
     setPinNumber(member?.pin_number?.toString() || "");
     setEmail(user?.email || "");
     setPhoneNumber(user?.phone || "");
+    setDateOfBirth(member?.date_of_birth || "");
     setCompanyHireDate(member?.company_hire_date || "");
     setEngineerDate(member?.engineer_date || "");
     setDivision(member?.division || null);
@@ -130,6 +169,15 @@ export default function ProfileScreen() {
               <ThemedText type="title" style={styles.title}>
                 Profile Information
               </ThemedText>
+
+              {!isAdmin && (
+                <ThemedView style={styles.infoNote}>
+                  <ThemedText style={styles.infoText}>
+                    You can only update your phone number from this page. If any other information is incorrect, please
+                    contact your Division Admin to make the necessary changes.
+                  </ThemedText>
+                </ThemedView>
+              )}
 
               {error && <ThemedText style={styles.error}>{error}</ThemedText>}
 
@@ -183,6 +231,23 @@ export default function ProfileScreen() {
                     editable={isEditing}
                     keyboardType="phone-pad"
                     style={styles.input}
+                  />
+                </View>
+
+                <View style={styles.field}>
+                  <ThemedText style={styles.label}>Date of Birth</ThemedText>
+                  <ThemedTextInput
+                    value={dateOfBirth}
+                    onChangeText={(text) => {
+                      // Format the date as YYYY-MM-DD
+                      const formattedDate = text.replace(/\D/g, "").replace(/(\d{4})(\d{2})(\d{2})/, "$1-$2-$3");
+                      setDateOfBirth(formattedDate);
+                    }}
+                    editable={isEditing && isAdmin}
+                    placeholder="YYYY-MM-DD"
+                    keyboardType="numeric"
+                    maxLength={10}
+                    style={[styles.input, !isAdmin && styles.disabledInput]}
                   />
                 </View>
 
@@ -329,5 +394,19 @@ const styles = StyleSheet.create({
     color: "#FF4444",
     textAlign: "center",
     marginBottom: 16,
+  },
+  infoNote: {
+    backgroundColor: "#2A2A2A",
+    borderWidth: 1,
+    borderColor: "#BAC42A",
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 20,
+  },
+  infoText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: "center",
   },
 });

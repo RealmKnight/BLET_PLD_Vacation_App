@@ -32,6 +32,10 @@ export default function HomeScreen() {
     router.push("/profile" as any);
   };
 
+  const handleAdmin = () => {
+    router.push("/admin" as any);
+  };
+
   const handleCalendar = () => {
     router.push("/calendar" as any);
   };
@@ -44,11 +48,18 @@ export default function HomeScreen() {
     router.push("/notifications" as any);
   };
 
+  const isAdmin = member?.role && ["division_admin", "union_admin", "application_admin"].includes(member.role);
+
   return (
     <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
       <ThemedView style={styles.container}>
         <View style={styles.fixedHeader}>
           <View style={[styles.headerButtons, isMobile && styles.headerButtonsMobile]}>
+            {isAdmin && (
+              <TouchableOpacity onPress={handleAdmin} style={styles.headerButton}>
+                <Ionicons name="settings-outline" size={24} color="#BAC42A" />
+              </TouchableOpacity>
+            )}
             <TouchableOpacity onPress={handleProfile} style={styles.headerButton}>
               <Ionicons name="person-circle-outline" size={24} color="#BAC42A" />
             </TouchableOpacity>
@@ -157,17 +168,33 @@ const styles = StyleSheet.create({
   },
   headerButtons: {
     flexDirection: "row",
-    justifyContent: "flex-end",
+    justifyContent: "space-between",
     alignItems: "center",
-    paddingRight: 20,
+    paddingHorizontal: 20,
     gap: 16,
   },
   headerButtonsMobile: {
-    paddingRight: 10,
+    paddingHorizontal: 10,
     gap: 8,
   },
   headerButton: {
     padding: 4,
+  },
+  headerButtonsLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
+  },
+  headerButtonsRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
+  },
+  headerButtonsLeftMobile: {
+    gap: 8,
+  },
+  headerButtonsRightMobile: {
+    gap: 8,
   },
   scrollView: {
     flex: 1,
