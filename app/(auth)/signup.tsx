@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { StyleSheet, TouchableOpacity, View, useWindowDimensions, Platform } from "react-native";
+import { StyleSheet, TouchableOpacity, View, useWindowDimensions, Platform, ScrollView } from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -58,57 +58,59 @@ export default function SignupScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
-      <ThemedView style={styles.container}>
-        <AuthHeader />
+      <ScrollView contentContainerStyle={styles.scrollContent} bounces={false} showsVerticalScrollIndicator={false}>
+        <ThemedView style={styles.container}>
+          <AuthHeader />
 
-        <ThemedView style={[styles.form, isMobile && styles.formMobile]}>
-          <ThemedText type="title" style={[styles.title, isMobile && styles.titleMobile]}>
-            Create Account
-          </ThemedText>
-          <ThemedText style={[styles.subtitle, isMobile && styles.subtitleMobile]}>Sign up to get started</ThemedText>
-
-          <ThemedTextInput
-            placeholder="Email"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            style={[styles.input, isMobile && styles.inputMobile]}
-          />
-
-          <ThemedTextInput
-            placeholder="Password"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            style={[styles.input, isMobile && styles.inputMobile]}
-          />
-
-          <ThemedTextInput
-            placeholder="Confirm Password"
-            value={confirmPassword}
-            onChangeText={setConfirmPassword}
-            secureTextEntry
-            style={[styles.input, isMobile && styles.inputMobile]}
-          />
-
-          {error && <ThemedText style={styles.error}>{error}</ThemedText>}
-
-          <TouchableOpacity
-            style={[styles.button, isLoading && styles.buttonDisabled, isMobile && styles.buttonMobile]}
-            onPress={handleSignup}
-            disabled={isLoading}
-          >
-            <ThemedText style={styles.buttonText}>{isLoading ? "Creating Account..." : "Create Account"}</ThemedText>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.loginLink} onPress={() => router.push("/(auth)/login")}>
-            <ThemedText style={styles.loginText}>
-              Already have an account? <ThemedText style={styles.loginTextHighlight}>Sign in</ThemedText>
+          <ThemedView style={[styles.form, isMobile && styles.formMobile]}>
+            <ThemedText type="title" style={[styles.title, isMobile && styles.titleMobile]}>
+              Create Account
             </ThemedText>
-          </TouchableOpacity>
+            <ThemedText style={[styles.subtitle, isMobile && styles.subtitleMobile]}>Sign up to get started</ThemedText>
+
+            <ThemedTextInput
+              placeholder="Email"
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              style={[styles.input, isMobile && styles.inputMobile]}
+            />
+
+            <ThemedTextInput
+              placeholder="Password"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              style={[styles.input, isMobile && styles.inputMobile]}
+            />
+
+            <ThemedTextInput
+              placeholder="Confirm Password"
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              secureTextEntry
+              style={[styles.input, isMobile && styles.inputMobile]}
+            />
+
+            {error && <ThemedText style={styles.error}>{error}</ThemedText>}
+
+            <TouchableOpacity
+              style={[styles.button, isLoading && styles.buttonDisabled, isMobile && styles.buttonMobile]}
+              onPress={handleSignup}
+              disabled={isLoading}
+            >
+              <ThemedText style={styles.buttonText}>{isLoading ? "Creating Account..." : "Create Account"}</ThemedText>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.loginLink} onPress={() => router.push("/(auth)/login")}>
+              <ThemedText style={styles.loginText}>
+                Already have an account? <ThemedText style={styles.loginTextHighlight}>Sign in</ThemedText>
+              </ThemedText>
+            </TouchableOpacity>
+          </ThemedView>
         </ThemedView>
-      </ThemedView>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -118,10 +120,14 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#000000",
   },
+  scrollContent: {
+    flexGrow: 1,
+  },
   container: {
     flex: 1,
     justifyContent: "center",
     paddingTop: Platform.OS === "ios" ? 44 : 24,
+    minHeight: "100%",
   },
   form: {
     padding: 20,
@@ -129,6 +135,7 @@ const styles = StyleSheet.create({
     maxWidth: 600,
     alignSelf: "center",
     width: "100%",
+    marginBottom: 20,
   },
   formMobile: {
     padding: 16,

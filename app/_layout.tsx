@@ -63,6 +63,9 @@ function RootLayoutNav() {
     return <LoadingScreen />;
   }
 
+  // Check if user is an admin
+  const isAdmin = member?.role && ["division_admin", "union_admin", "application_admin"].includes(member.role);
+
   return (
     <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
       <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
@@ -70,6 +73,7 @@ function RootLayoutNav() {
         <Stack.Screen name="(auth)" redirect={!!member || (!!user && needsMemberAssociation)} />
         <Stack.Screen name="(member-association)" redirect={!user || !!member || !needsMemberAssociation} />
         <Stack.Screen name="(tabs)" redirect={!member} />
+        <Stack.Screen name="(admin)" redirect={!member || !isAdmin} />
         <Stack.Screen name="index" redirect={true} />
       </Stack>
     </ThemeProvider>

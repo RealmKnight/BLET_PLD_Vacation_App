@@ -1,6 +1,6 @@
 import React from "react";
 import { StyleSheet, TouchableOpacity, View, Platform, useWindowDimensions } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, usePathname } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -22,15 +22,28 @@ export function AppHeader({
   customRightButtons,
 }: AppHeaderProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const { member, signOut } = useAuth();
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
 
   // Check if user is an admin (not just a regular user)
   const isAdmin = member?.role && ["division_admin", "union_admin", "application_admin"].includes(member.role);
+  const isAdminRoute = pathname.includes("(admin)") || ["/application", "/union", "/division"].includes(pathname);
+
+  // Debug logging
+  console.log("Current pathname:", pathname);
+  console.log("Is admin route:", isAdminRoute);
 
   const handleBack = () => router.back();
-  const handleAdmin = () => router.push("/(tabs)/admin" as any);
+  const handleAdmin = () => {
+    console.log("Handling admin click, isAdminRoute:", isAdminRoute);
+    if (isAdminRoute) {
+      router.push("/(tabs)");
+    } else {
+      router.push("/(admin)/application");
+    }
+  };
   const handleProfile = () => router.push("/profile" as any);
   const handleLogout = async () => {
     try {
@@ -55,7 +68,7 @@ export function AppHeader({
               )}
               {showAdminButton && isAdmin && (
                 <TouchableOpacity onPress={handleAdmin} style={styles.headerButton}>
-                  <Ionicons name="settings-outline" size={24} color="#BAC42A" />
+                  <Ionicons name={isAdminRoute ? "home-outline" : "settings-outline"} size={24} color="#BAC42A" />
                 </TouchableOpacity>
               )}
             </>

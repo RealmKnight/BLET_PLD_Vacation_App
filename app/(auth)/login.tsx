@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { StyleSheet, TouchableOpacity, View, useWindowDimensions, Platform } from "react-native";
+import { StyleSheet, TouchableOpacity, View, useWindowDimensions, Platform, ScrollView } from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { supabase } from "@/lib/supabase";
@@ -47,49 +47,53 @@ export default function LoginScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
-      <ThemedView style={styles.container}>
-        <AuthHeader />
+      <ScrollView contentContainerStyle={styles.scrollContent} bounces={false} showsVerticalScrollIndicator={false}>
+        <ThemedView style={styles.container}>
+          <AuthHeader />
 
-        <ThemedView style={[styles.form, isMobile && styles.formMobile]}>
-          <ThemedText type="title" style={[styles.title, isMobile && styles.titleMobile]}>
-            Welcome Back
-          </ThemedText>
-          <ThemedText style={[styles.subtitle, isMobile && styles.subtitleMobile]}>Sign in to your account</ThemedText>
-
-          <ThemedTextInput
-            placeholder="Email"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            style={[styles.input, isMobile && styles.inputMobile]}
-          />
-
-          <ThemedTextInput
-            placeholder="Password"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            style={[styles.input, isMobile && styles.inputMobile]}
-          />
-
-          {error && <ThemedText style={styles.error}>{error}</ThemedText>}
-
-          <TouchableOpacity
-            style={[styles.button, isLoading && styles.buttonDisabled, isMobile && styles.buttonMobile]}
-            onPress={handleLogin}
-            disabled={isLoading}
-          >
-            <ThemedText style={styles.buttonText}>{isLoading ? "Signing in..." : "Sign In"}</ThemedText>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.signupLink} onPress={() => router.push("/(auth)/signup")}>
-            <ThemedText style={styles.signupText}>
-              Don't have an account? <ThemedText style={styles.signupTextHighlight}>Sign up</ThemedText>
+          <ThemedView style={[styles.form, isMobile && styles.formMobile]}>
+            <ThemedText type="title" style={[styles.title, isMobile && styles.titleMobile]}>
+              Welcome Back
             </ThemedText>
-          </TouchableOpacity>
+            <ThemedText style={[styles.subtitle, isMobile && styles.subtitleMobile]}>
+              Sign in to your account
+            </ThemedText>
+
+            <ThemedTextInput
+              placeholder="Email"
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              style={[styles.input, isMobile && styles.inputMobile]}
+            />
+
+            <ThemedTextInput
+              placeholder="Password"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              style={[styles.input, isMobile && styles.inputMobile]}
+            />
+
+            {error && <ThemedText style={styles.error}>{error}</ThemedText>}
+
+            <TouchableOpacity
+              style={[styles.button, isLoading && styles.buttonDisabled, isMobile && styles.buttonMobile]}
+              onPress={handleLogin}
+              disabled={isLoading}
+            >
+              <ThemedText style={styles.buttonText}>{isLoading ? "Signing in..." : "Sign In"}</ThemedText>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.signupLink} onPress={() => router.push("/(auth)/signup")}>
+              <ThemedText style={styles.signupText}>
+                Don't have an account? <ThemedText style={styles.signupTextHighlight}>Sign up</ThemedText>
+              </ThemedText>
+            </TouchableOpacity>
+          </ThemedView>
         </ThemedView>
-      </ThemedView>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -99,10 +103,14 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#000000",
   },
+  scrollContent: {
+    flexGrow: 1,
+  },
   container: {
     flex: 1,
     justifyContent: "center",
     paddingTop: Platform.OS === "ios" ? 44 : 24,
+    minHeight: "100%",
   },
   form: {
     padding: 20,
@@ -110,6 +118,7 @@ const styles = StyleSheet.create({
     maxWidth: 600,
     alignSelf: "center",
     width: "100%",
+    marginBottom: 20,
   },
   formMobile: {
     padding: 16,
