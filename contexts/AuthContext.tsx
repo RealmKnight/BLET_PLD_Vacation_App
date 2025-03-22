@@ -39,6 +39,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const initialCheckRef = useRef(false);
   const lastActiveRef = useRef(Date.now());
   const isFetchingRef = useRef(false);
+  const sessionCheckTimeoutRef = useRef<NodeJS.Timeout>();
+  const lastSessionCheckRef = useRef(Date.now());
+  const isInitializedRef = useRef(false);
 
   // Function to update all auth states at once
   const updateAuthState = (states: {
@@ -47,16 +50,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     needsMemberAssociation: boolean;
     isLoading: boolean;
   }) => {
-    setUser(states.user);
-    setMember(states.member);
-    setNeedsMemberAssociation(states.needsMemberAssociation);
-    setIsLoading(states.isLoading);
+    // Only update if there are actual changes
+    const hasChanges =
+      states.user?.id !== user?.id ||
+      states.member?.id !== member?.id ||
+      states.needsMemberAssociation !== needsMemberAssociation ||
+      states.isLoading !== isLoading;
+
+    if (hasChanges) {
+      console.log("Updating auth state:", states);
+      setUser(states.user);
+      setMember(states.member);
+      setNeedsMemberAssociation(states.needsMemberAssociation);
+      setIsLoading(states.isLoading);
+    }
   };
 
   const fetchMember = async (userId: string) => {
     // Prevent concurrent fetches
     if (isFetchingRef.current) {
       console.log("Already fetching member data, skipping...");
+      return;
+    }
+
+    // Don't fetch if we already have this member
+    if (member?.id === userId) {
+      console.log("Member data already exists for user:", userId);
       return;
     }
 
@@ -83,8 +102,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (memberData) {
         console.log("Found associated member:", memberData);
+        // Ensure we still have the user when setting member
+        const { data: currentUser } = await supabase.auth.getUser();
         updateAuthState({
-          user,
+          user: currentUser?.user || null,
           member: memberData,
           needsMemberAssociation: false,
           isLoading: false,
@@ -97,7 +118,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       updateAuthState({
         user,
         member: null,
-        needsMemberAssociation: false,
+        needsMemberAssociation: true,
         isLoading: false,
       });
     } catch (error) {
@@ -115,6 +136,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Function to check and restore session
   const checkAndRestoreSession = async (force = false) => {
+    const now = Date.now();
+    const timeSinceLastCheck = now - lastSessionCheckRef.current;
+
+    // Debounce session checks (2 second minimum between checks)
+    if (!force && timeSinceLastCheck < 2000) {
+      console.log("Skipping session check due to debounce", { timeSinceLastCheck });
+      return;
+    }
+
+    // Don't check if we already have both user and member unless forced
+    if (!force && user && member) {
+      console.log("Already have user and member, skipping session check");
+      return;
+    }
+
+    lastSessionCheckRef.current = now;
+
     try {
       console.log("Checking for existing session...", { force });
       const {
@@ -126,9 +164,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Only update state if we have a different user or force is true
         if (force || !user || user.id !== session.user.id) {
           setUser(session.user);
-          if (!member) {
+          if (!member || member.id !== session.user.id) {
             setIsLoading(true);
             await fetchMember(session.user.id);
+          } else {
+            setIsLoading(false);
           }
         } else {
           setIsLoading(false);
@@ -153,77 +193,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Add visibility change handler for web
+  // Initialize auth state once
   useEffect(() => {
-    if (!isWeb) return;
-
-    async function handleVisibilityChange() {
-      const now = Date.now();
-      const timeSinceLastActive = now - lastActiveRef.current;
-      const isVisible = document.visibilityState === "visible";
-
-      if (isVisible) {
-        console.log("Tab became visible", { timeSinceLastActive });
-        // Only check session if we don't have a user or member
-        if (!user || !member) {
-          await checkAndRestoreSession(true);
-        }
-        lastActiveRef.current = now;
-      }
-    }
-
-    // Check immediately on mount
-    if (!initialCheckRef.current) {
-      initialCheckRef.current = true;
-      checkAndRestoreSession(true);
-    }
-
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () => {
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-    };
-  }, [isWeb, user, member]);
-
-  // Add a timeout safety net for web
-  useEffect(() => {
-    if (isWeb) {
-      // Set hydrated after initial render
-      setIsHydrated(true);
-
-      // Set a timeout to prevent infinite loading
-      initTimeoutRef.current = setTimeout(() => {
-        console.log("Auth initialization timeout reached, resetting loading state");
-        setIsLoading(false);
-      }, 5000); // 5 second timeout
-    }
-
-    return () => {
-      if (initTimeoutRef.current) {
-        clearTimeout(initTimeoutRef.current);
-      }
-    };
-  }, [isWeb]);
-
-  useEffect(() => {
-    let mounted = true;
+    if (isInitializedRef.current) return;
+    isInitializedRef.current = true;
 
     async function initializeAuth() {
-      if (!mounted || initialCheckRef.current) return;
-
       try {
         console.log("Initializing auth state...");
-        initialCheckRef.current = true;
-        await checkAndRestoreSession();
+        await checkAndRestoreSession(true);
       } catch (error) {
         console.error("Error in initializeAuth:", error);
-        if (mounted) {
-          updateAuthState({
-            user: null,
-            member: null,
-            needsMemberAssociation: false,
-            isLoading: false,
-          });
-        }
+        updateAuthState({
+          user: null,
+          member: null,
+          needsMemberAssociation: false,
+          isLoading: false,
+        });
       }
     }
 
@@ -260,10 +246,55 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     return () => {
-      mounted = false;
       subscription.unsubscribe();
     };
-  }, [user]);
+  }, []); // Empty dependency array since this should only run once
+
+  // Add visibility change handler for web
+  useEffect(() => {
+    if (!isWeb) return;
+
+    async function handleVisibilityChange() {
+      const now = Date.now();
+      const timeSinceLastActive = now - lastActiveRef.current;
+      const isVisible = document.visibilityState === "visible";
+
+      if (isVisible && timeSinceLastActive > 5000) {
+        // Only check if more than 5 seconds have passed
+        console.log("Tab became visible", { timeSinceLastActive });
+        // Only check session if we don't have both user and member
+        if (!user || !member) {
+          await checkAndRestoreSession(true);
+        }
+        lastActiveRef.current = now;
+      }
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [isWeb, user, member]);
+
+  // Add a timeout safety net for web
+  useEffect(() => {
+    if (!isWeb || !isLoading) return;
+
+    // Set hydrated after initial render
+    setIsHydrated(true);
+
+    // Set a timeout to prevent infinite loading
+    initTimeoutRef.current = setTimeout(() => {
+      console.log("Auth initialization timeout reached, resetting loading state");
+      setIsLoading(false);
+    }, 10000); // 10 second timeout to allow for slower connections
+
+    return () => {
+      if (initTimeoutRef.current) {
+        clearTimeout(initTimeoutRef.current);
+      }
+    };
+  }, [isWeb, isLoading]);
 
   const signIn = async (email: string, password: string) => {
     try {
