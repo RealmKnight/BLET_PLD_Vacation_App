@@ -1,4 +1,4 @@
-import { ActivityIndicator, StyleSheet, Platform, Pressable } from "react-native";
+import { ActivityIndicator, StyleSheet, Platform, Pressable, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ThemedView } from "./ThemedView";
 import { ThemedText } from "./ThemedText";
@@ -26,23 +26,29 @@ export function LoadingScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
-      <ThemedView style={styles.container}>
-        <ActivityIndicator size="large" color="#BAC42A" />
-        {showFallback && isWeb && (
-          <Pressable onPress={handleRefresh}>
-            <ThemedView style={styles.fallbackContainer}>
-              <ThemedText style={styles.fallbackText}>Taking longer than expected?</ThemedText>
-              <ThemedText style={styles.refreshText}>Click here to refresh</ThemedText>
-            </ThemedView>
-          </Pressable>
-        )}
-      </ThemedView>
-    </SafeAreaView>
+    <View style={styles.root}>
+      <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
+        <View style={styles.container}>
+          <ActivityIndicator size="large" color="#BAC42A" />
+          {showFallback && isWeb && (
+            <Pressable onPress={handleRefresh}>
+              <View style={styles.fallbackContainer}>
+                <ThemedText style={styles.fallbackText}>Taking longer than expected?</ThemedText>
+                <ThemedText style={styles.refreshText}>Click here to refresh</ThemedText>
+              </View>
+            </Pressable>
+          )}
+        </View>
+      </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: "#000000",
+  },
   safeArea: {
     flex: 1,
     backgroundColor: "#000000",
@@ -51,6 +57,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+    backgroundColor: "#000000",
   },
   fallbackContainer: {
     marginTop: 20,
@@ -61,6 +68,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
     opacity: 0.7,
     fontSize: 16,
+    color: "#FFFFFF",
   },
   refreshText: {
     marginTop: 8,

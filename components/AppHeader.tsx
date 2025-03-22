@@ -44,7 +44,10 @@ export function AppHeader({
       router.push("/(admin)/application");
     }
   };
-  const handleProfile = () => router.push("/profile" as any);
+  const handleProfile = () => {
+    console.log("Navigating to profile");
+    router.push("/(profile)");
+  };
   const handleLogout = async () => {
     try {
       await signOut();

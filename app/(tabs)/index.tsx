@@ -30,7 +30,8 @@ export default function HomeScreen() {
   };
 
   const handleProfile = () => {
-    router.push("/profile" as any);
+    console.log("Navigating to profile from home");
+    router.push("/(profile)");
   };
 
   const handleAdmin = () => {

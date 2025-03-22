@@ -1,3 +1,4 @@
+import React from "react";
 import { DarkTheme, DefaultTheme, ThemeProvider } from "@react-navigation/native";
 import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
@@ -19,6 +20,17 @@ export default function RootLayout() {
   const [loaded, error] = useFonts({
     // Add your fonts here
   });
+  const colorScheme = useColorScheme();
+
+  // Create custom dark theme
+  const customDarkTheme = {
+    ...DarkTheme,
+    colors: {
+      ...DarkTheme.colors,
+      background: "#000000",
+      card: "#000000",
+    },
+  };
 
   // Expo Router uses Error Boundaries to catch errors in the navigation tree.
   useEffect(() => {
@@ -31,14 +43,17 @@ export default function RootLayout() {
     }
   }, [loaded]);
 
-  if (!loaded) {
-    return null;
-  }
-
   return (
-    <AuthProvider>
-      <RootLayoutNav />
-    </AuthProvider>
+    <ThemeProvider value={colorScheme === "dark" ? customDarkTheme : DefaultTheme}>
+      <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
+      {!loaded ? (
+        <LoadingScreen />
+      ) : (
+        <AuthProvider>
+          <RootLayoutNav />
+        </AuthProvider>
+      )}
+    </ThemeProvider>
   );
 }
 
@@ -146,15 +161,24 @@ function RootLayoutNav() {
   const isAdmin = member?.role && ["division_admin", "union_admin", "application_admin"].includes(member.role);
 
   return (
-    <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
+    <>
       <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
-      <Stack screenOptions={{ headerShown: false }}>
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          contentStyle: { backgroundColor: "#000000" },
+          animation: "fade",
+          animationDuration: 200,
+          presentation: "card",
+        }}
+      >
         <Stack.Screen name="(auth)" redirect={!!member || (!!user && needsMemberAssociation)} />
         <Stack.Screen name="(member-association)" redirect={!user || !!member || !needsMemberAssociation} />
         <Stack.Screen name="(tabs)" redirect={!member} />
         <Stack.Screen name="(admin)" redirect={!member || !isAdmin} />
+        <Stack.Screen name="(profile)" options={{ animation: "slide_from_right" }} />
         <Stack.Screen name="index" redirect={true} />
       </Stack>
-    </ThemeProvider>
+    </>
   );
 }
