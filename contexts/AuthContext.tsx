@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import { Database } from "@/types/supabase";
 import { User } from "@supabase/supabase-js";
@@ -33,6 +33,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [member, setMember] = useState<Member | null>(null);
   const [needsMemberAssociation, setNeedsMemberAssociation] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isHydrated, setIsHydrated] = useState(Platform.OS !== "web");
+  const initTimeoutRef = useRef<NodeJS.Timeout>();
+  const isWeb = Platform.OS === "web";
+  const initialCheckRef = useRef(false);
+  const lastActiveRef = useRef(Date.now());
+  const isFetchingRef = useRef(false);
 
   // Function to update all auth states at once
   const updateAuthState = (states: {
@@ -48,25 +54,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const fetchMember = async (userId: string) => {
+    // Prevent concurrent fetches
+    if (isFetchingRef.current) {
+      console.log("Already fetching member data, skipping...");
+      return;
+    }
+
     try {
+      isFetchingRef.current = true;
       console.log("Fetching member data for user:", userId);
-
-      // First get the current session to ensure we have the latest user data
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      const currentUser = session?.user || null;
-
-      if (!currentUser) {
-        console.log("No active session found during fetchMember");
-        updateAuthState({
-          user: currentUser,
-          member: member,
-          needsMemberAssociation: needsMemberAssociation,
-          isLoading: false,
-        });
-        return;
-      }
 
       const { data: memberData, error: memberError } = await supabase
         .from("members")
@@ -74,30 +70,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .eq("id", userId)
         .maybeSingle();
 
-      console.log("Member query result:", {
-        memberData,
-        hasError: !!memberError,
-        errorCode: memberError?.code,
-        platform: Platform.OS,
-      });
-
-      // Handle network errors first
-      if (memberError?.code === "PGRST116") {
-        console.log("Network error encountered, preserving previous member state");
-        updateAuthState({
-          user: currentUser,
-          member: member,
-          needsMemberAssociation: needsMemberAssociation,
-          isLoading: false,
-        });
-        return;
-      }
-
-      // Clear member state if there's any other error
       if (memberError) {
         console.error("Error fetching member:", memberError);
         updateAuthState({
-          user: currentUser,
+          user,
           member: null,
           needsMemberAssociation: false,
           isLoading: false,
@@ -105,11 +81,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      // If we have member data, update state and return early
       if (memberData) {
         console.log("Found associated member:", memberData);
         updateAuthState({
-          user: currentUser,
+          user,
           member: memberData,
           needsMemberAssociation: false,
           isLoading: false,
@@ -117,24 +92,58 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      // If we get here, we have no member data and no errors
-      console.log("No associated member found for user, checking for unclaimed members");
-      const { data: unclaimedData, error: unclaimedError } = await supabase.from("members").select("*").is("id", null);
-
-      const hasUnclaimedMembers = !unclaimedError && unclaimedData && unclaimedData.length > 0;
-      console.log("Unclaimed members check:", {
-        hasUnclaimedMembers,
-        hasError: !!unclaimedError,
-      });
-
+      // If we get here, we have no member data
+      console.log("No associated member found for user");
       updateAuthState({
-        user: currentUser,
+        user,
         member: null,
-        needsMemberAssociation: hasUnclaimedMembers,
+        needsMemberAssociation: false,
         isLoading: false,
       });
     } catch (error) {
       console.error("Unexpected error in fetchMember:", error);
+      updateAuthState({
+        user,
+        member: null,
+        needsMemberAssociation: false,
+        isLoading: false,
+      });
+    } finally {
+      isFetchingRef.current = false;
+    }
+  };
+
+  // Function to check and restore session
+  const checkAndRestoreSession = async (force = false) => {
+    try {
+      console.log("Checking for existing session...", { force });
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (session?.user) {
+        console.log("Found existing session, restoring state...");
+        // Only update state if we have a different user or force is true
+        if (force || !user || user.id !== session.user.id) {
+          setUser(session.user);
+          if (!member) {
+            setIsLoading(true);
+            await fetchMember(session.user.id);
+          }
+        } else {
+          setIsLoading(false);
+        }
+      } else {
+        console.log("No valid session found");
+        updateAuthState({
+          user: null,
+          member: null,
+          needsMemberAssociation: false,
+          isLoading: false,
+        });
+      }
+    } catch (error) {
+      console.error("Error checking session:", error);
       updateAuthState({
         user: null,
         member: null,
@@ -144,57 +153,67 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // Add visibility change handler for web
+  useEffect(() => {
+    if (!isWeb) return;
+
+    async function handleVisibilityChange() {
+      const now = Date.now();
+      const timeSinceLastActive = now - lastActiveRef.current;
+      const isVisible = document.visibilityState === "visible";
+
+      if (isVisible) {
+        console.log("Tab became visible", { timeSinceLastActive });
+        // Only check session if we don't have a user or member
+        if (!user || !member) {
+          await checkAndRestoreSession(true);
+        }
+        lastActiveRef.current = now;
+      }
+    }
+
+    // Check immediately on mount
+    if (!initialCheckRef.current) {
+      initialCheckRef.current = true;
+      checkAndRestoreSession(true);
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [isWeb, user, member]);
+
+  // Add a timeout safety net for web
+  useEffect(() => {
+    if (isWeb) {
+      // Set hydrated after initial render
+      setIsHydrated(true);
+
+      // Set a timeout to prevent infinite loading
+      initTimeoutRef.current = setTimeout(() => {
+        console.log("Auth initialization timeout reached, resetting loading state");
+        setIsLoading(false);
+      }, 5000); // 5 second timeout
+    }
+
+    return () => {
+      if (initTimeoutRef.current) {
+        clearTimeout(initTimeoutRef.current);
+      }
+    };
+  }, [isWeb]);
+
   useEffect(() => {
     let mounted = true;
 
     async function initializeAuth() {
+      if (!mounted || initialCheckRef.current) return;
+
       try {
         console.log("Initializing auth state...");
-        const {
-          data: { session },
-          error: sessionError,
-        } = await supabase.auth.getSession();
-
-        if (!mounted) return;
-
-        if (sessionError) {
-          console.error("Error getting session:", sessionError);
-          updateAuthState({
-            user: null,
-            member: null,
-            needsMemberAssociation: false,
-            isLoading: false,
-          });
-          return;
-        }
-
-        console.log("Session check result:", {
-          hasSession: !!session,
-          userId: session?.user?.id,
-          platform: Platform.OS,
-        });
-
-        if (!session?.user) {
-          console.log("No active session found, clearing state");
-          updateAuthState({
-            user: null,
-            member: null,
-            needsMemberAssociation: false,
-            isLoading: false,
-          });
-          return;
-        }
-
-        // Set initial state with user
-        updateAuthState({
-          user: session.user,
-          member: null,
-          needsMemberAssociation: false,
-          isLoading: true,
-        });
-
-        // Then fetch member data
-        await fetchMember(session.user.id);
+        initialCheckRef.current = true;
+        await checkAndRestoreSession();
       } catch (error) {
         console.error("Error in initializeAuth:", error);
         if (mounted) {
@@ -215,8 +234,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (!mounted) return;
-
       console.log("Auth state change event:", _event, {
         hasSession: !!session,
         userId: session?.user?.id,
@@ -234,23 +251,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      // Set initial state with user
-      updateAuthState({
-        user: session.user,
-        member: null,
-        needsMemberAssociation: false,
-        isLoading: true,
-      });
-
-      // Then fetch member data
-      await fetchMember(session.user.id);
+      // Only update state if we have a different user
+      if (!user || user.id !== session.user.id) {
+        setUser(session.user);
+        setIsLoading(true);
+        await fetchMember(session.user.id);
+      }
     });
 
     return () => {
       mounted = false;
       subscription.unsubscribe();
     };
-  }, []);
+  }, [user]);
 
   const signIn = async (email: string, password: string) => {
     try {
@@ -262,7 +275,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (error) throw error;
 
       if (data.user) {
-        await fetchMember(data.user.id);
+        // Force a fresh session check after sign in
+        await checkAndRestoreSession(true);
       }
     } catch (error) {
       console.error("Error signing in:", error);

@@ -3,7 +3,7 @@ import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
-import { useEffect } from "react";
+import { useEffect, useState, useRef } from "react";
 import "react-native-reanimated";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { LoadingScreen } from "@/components";
@@ -45,21 +45,100 @@ export default function RootLayout() {
 function RootLayoutNav() {
   const { member, isLoading, needsMemberAssociation, user } = useAuth();
   const colorScheme = useColorScheme();
+  const [isNavigating, setIsNavigating] = useState(false);
+  const isWeb = Platform.OS === "web";
+  const [isTabVisible, setIsTabVisible] = useState(true);
+  const [initialLoad, setInitialLoad] = useState(true);
+  const prevUserRef = useRef(user);
+  const prevMemberRef = useRef(member);
+  const loadingTimeoutRef = useRef<NodeJS.Timeout>();
 
   // Add more detailed logging
   useEffect(() => {
     console.log("RootLayoutNav state change:", {
       hasMember: !!member,
       hasUser: !!user,
+      hadPrevUser: !!prevUserRef.current,
+      hadPrevMember: !!prevMemberRef.current,
       memberData: member,
       isLoading,
       needsMemberAssociation,
       platform: Platform.OS,
       timestamp: new Date().toISOString(),
+      initialLoad,
     });
-  }, [member, isLoading, needsMemberAssociation, user]);
 
-  if (isLoading) {
+    // Update refs after logging
+    prevUserRef.current = user;
+    prevMemberRef.current = member;
+  }, [member, isLoading, needsMemberAssociation, user, initialLoad]);
+
+  // Handle initial load state
+  useEffect(() => {
+    if (!isLoading && initialLoad) {
+      setInitialLoad(false);
+    }
+  }, [isLoading]);
+
+  // Handle tab visibility for web
+  useEffect(() => {
+    if (!isWeb) return;
+
+    function handleVisibilityChange() {
+      const isVisible = document.visibilityState === "visible";
+      setIsTabVisible(isVisible);
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [isWeb]);
+
+  // Handle loading timeout for web
+  useEffect(() => {
+    if (!isWeb || !isLoading) return;
+
+    // Clear any existing timeout
+    if (loadingTimeoutRef.current) {
+      clearTimeout(loadingTimeoutRef.current);
+    }
+
+    // Set a new timeout
+    loadingTimeoutRef.current = setTimeout(() => {
+      console.log("Loading timeout reached, forcing navigation state reset");
+      setIsNavigating(false);
+      setInitialLoad(false);
+    }, 3000); // 3 second timeout
+
+    return () => {
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current);
+      }
+    };
+  }, [isWeb, isLoading]);
+
+  // Handle navigation state
+  useEffect(() => {
+    if (!isLoading && !initialLoad) {
+      setIsNavigating(true);
+      const timeout = setTimeout(
+        () => {
+          setIsNavigating(false);
+        },
+        isWeb ? 100 : 1000
+      );
+      return () => clearTimeout(timeout);
+    }
+  }, [isLoading, isWeb, initialLoad]);
+
+  // Show loading only during initial load or explicit loading states
+  const shouldShowLoading =
+    (initialLoad && isLoading) || // Initial load
+    (!initialLoad && isLoading && !member) || // Loading without member
+    (isNavigating && !isWeb); // Native navigation
+
+  if (shouldShowLoading && isTabVisible) {
     return <LoadingScreen />;
   }
 
