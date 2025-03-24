@@ -8,7 +8,9 @@ export type ThemedViewProps = ViewProps & {
 };
 
 export function ThemedView({ style, lightColor, darkColor, ...otherProps }: ThemedViewProps) {
-  const backgroundColor = useThemeColor({ light: lightColor, dark: darkColor }, "background");
+  // Force black background for dark mode to prevent flashing
+  const actualDarkColor = darkColor || "#000000";
+  const backgroundColor = useThemeColor({ light: lightColor, dark: actualDarkColor }, "background");
 
   return <View style={[{ backgroundColor }, style]} {...otherProps} />;
 }

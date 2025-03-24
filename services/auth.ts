@@ -44,7 +44,6 @@ export async function register(input: RegisterInput) {
     // Create member profile
     const { error: memberError } = await supabase.from("members").insert({
       id: authData.user.id,
-      email: validatedData.email,
       full_name: validatedData.fullName,
       division_id: validatedData.divisionId,
       role: "user", // Default role for new members

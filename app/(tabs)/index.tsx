@@ -54,28 +54,30 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
-      <ThemedView style={styles.container}>
+      <ThemedView style={[styles.container, { backgroundColor: "#000000" }]}>
         <AppHeader />
         <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
+          style={[styles.scrollView, { backgroundColor: "#000000" }]}
+          contentContainerStyle={[styles.scrollContent, { backgroundColor: "#000000" }]}
           showsVerticalScrollIndicator={false}
         >
-          <ThemedView style={[styles.content, isMobile && styles.contentMobile]}>
-            <View style={styles.headerContainer}>
-              <View style={styles.header}>
+          <ThemedView style={[styles.content, isMobile && styles.contentMobile, { backgroundColor: "#000000" }]}>
+            <View style={[styles.headerContainer, { backgroundColor: "#000000" }]}>
+              <View style={[styles.header, { backgroundColor: "#000000" }]}>
                 <AuthHeader />
               </View>
             </View>
 
-            <ThemedView style={styles.welcomeContainer}>
+            <ThemedView style={[styles.welcomeContainer, { backgroundColor: "#000000" }]}>
               <ThemedText type="title" style={[styles.welcomeText, isMobile && styles.welcomeTextMobile]}>
                 Welcome, {member?.first_name}!
               </ThemedText>
               <HelloWave />
             </ThemedView>
 
-            <ThemedView style={[styles.featuresGrid, isMobile && styles.featuresGridMobile]}>
+            <ThemedView
+              style={[styles.featuresGrid, isMobile && styles.featuresGridMobile, { backgroundColor: "#000000" }]}
+            >
               <TouchableOpacity
                 style={[styles.featureCard, isMobile && styles.featureCardMobile]}
                 onPress={handleCalendar}
@@ -142,6 +144,7 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
+    backgroundColor: "#000000",
   },
   fixedHeader: {
     position: "absolute",
@@ -159,6 +162,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 20,
     gap: 16,
+    backgroundColor: "#000000",
   },
   headerButtonsMobile: {
     paddingHorizontal: 10,
@@ -171,11 +175,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 16,
+    backgroundColor: "#000000",
   },
   headerButtonsRight: {
     flexDirection: "row",
     alignItems: "center",
     gap: 16,
+    backgroundColor: "#000000",
   },
   headerButtonsLeftMobile: {
     gap: 8,
@@ -185,16 +191,19 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+    backgroundColor: "#000000",
   },
   scrollContent: {
     flexGrow: 1,
     paddingTop: Platform.OS === "ios" ? 80 : 60,
+    backgroundColor: "#000000",
   },
   content: {
     padding: 20,
     maxWidth: 1200,
     alignSelf: "center",
     width: "100%",
+    backgroundColor: "#000000",
   },
   contentMobile: {
     padding: 16,
@@ -202,15 +211,18 @@ const styles = StyleSheet.create({
   headerContainer: {
     paddingTop: 20,
     paddingBottom: 10,
+    backgroundColor: "#000000",
   },
   header: {
     alignItems: "center",
+    backgroundColor: "#000000",
   },
   welcomeContainer: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
     marginBottom: 24,
+    backgroundColor: "#000000",
   },
   welcomeText: {
     color: "#BAC42A",
@@ -224,6 +236,7 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: 16,
     justifyContent: "space-between",
+    backgroundColor: "#000000",
   },
   featuresGridMobile: {
     gap: 12,

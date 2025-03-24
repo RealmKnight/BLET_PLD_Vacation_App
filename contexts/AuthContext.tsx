@@ -6,9 +6,10 @@ import { Platform } from "react-native";
 
 type Member = Database["public"]["Tables"]["members"]["Row"];
 
+// Email comes from auth.users, not from members table
 interface AuthContextType {
-  user: User | null;
-  member: Member | null;
+  user: User | null; // Contains email from auth.users
+  member: Member | null; // Contains profile data from members table
   isLoading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<void>;

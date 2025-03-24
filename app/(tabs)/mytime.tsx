@@ -46,29 +46,36 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
+    backgroundColor: "#000000",
   },
   scrollView: {
     flex: 1,
+    backgroundColor: "#000000",
   },
   scrollContent: {
     flexGrow: 1,
     paddingTop: Platform.OS === "ios" ? 80 : 60,
+    backgroundColor: "#000000",
   },
   content: {
     padding: 20,
     maxWidth: 800,
     alignSelf: "center",
     width: "100%",
+    backgroundColor: "#000000",
   },
   contentMobile: {
     padding: 16,
+    backgroundColor: "#000000",
   },
   headerContainer: {
     paddingTop: 20,
     paddingBottom: 10,
+    backgroundColor: "#000000",
   },
   header: {
     alignItems: "center",
+    backgroundColor: "#000000",
   },
   title: {
     color: "#BAC42A",

@@ -131,7 +131,7 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
-      <ThemedView style={styles.container}>
+      <ThemedView style={[styles.container, { backgroundColor: "#000000" }]}>
         <AppHeader
           showBackButton
           showAdminButton={false}
@@ -154,18 +154,18 @@ export default function ProfileScreen() {
           }
         />
         <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
+          style={[styles.scrollView, { backgroundColor: "#000000" }]}
+          contentContainerStyle={[styles.scrollContent, { backgroundColor: "#000000" }]}
           showsVerticalScrollIndicator={false}
         >
-          <ThemedView style={[styles.content, isMobile && styles.contentMobile]}>
-            <View style={styles.headerContainer}>
-              <View style={styles.header}>
+          <ThemedView style={[styles.content, isMobile && styles.contentMobile, { backgroundColor: "#000000" }]}>
+            <View style={[styles.headerContainer, { backgroundColor: "#000000" }]}>
+              <View style={[styles.header, { backgroundColor: "#000000" }]}>
                 <AuthHeader />
               </View>
             </View>
 
-            <ThemedView style={styles.profileContainer}>
+            <ThemedView style={[styles.profileContainer, { backgroundColor: "#000000" }]}>
               <ThemedText type="title" style={styles.title}>
                 Profile Information
               </ThemedText>
@@ -306,42 +306,44 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
+    backgroundColor: "#000000",
   },
   scrollView: {
     flex: 1,
+    backgroundColor: "#000000",
   },
   scrollContent: {
     flexGrow: 1,
     paddingTop: Platform.OS === "ios" ? 80 : 60,
+    backgroundColor: "#000000",
   },
   content: {
     padding: 20,
-    maxWidth: 800,
+    maxWidth: 900,
     alignSelf: "center",
     width: "100%",
+    backgroundColor: "#000000",
   },
   contentMobile: {
     padding: 16,
+    backgroundColor: "#000000",
   },
   headerContainer: {
-    paddingTop: 20,
+    paddingTop: 0,
     paddingBottom: 10,
+    backgroundColor: "#000000",
   },
   header: {
     alignItems: "center",
+    backgroundColor: "#000000",
   },
   profileContainer: {
-    padding: 20,
-    borderRadius: 12,
-    backgroundColor: "#1A1A1A",
-    borderWidth: 1,
-    borderColor: "#BAC42A",
+    backgroundColor: "#000000",
   },
   title: {
     color: "#BAC42A",
     fontSize: 24,
-    marginBottom: 20,
-    textAlign: "center",
+    marginBottom: 16,
   },
   form: {
     gap: 16,

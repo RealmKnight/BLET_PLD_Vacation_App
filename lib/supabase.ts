@@ -7,6 +7,10 @@ import { Platform } from "react-native";
 const supabaseUrl = process.env.EXPO_PUBLIC_API_URL!;
 const supabaseAnonKey = process.env.EXPO_PUBLIC_API_KEY!;
 
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error("Missing Supabase configuration. Please check your .env file.");
+}
+
 // Custom storage adapter that works for web and native
 const ExpoSecureStoreAdapter = {
   getItem: async (key: string) => {
