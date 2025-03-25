@@ -43,7 +43,7 @@ export default function SignupScreen() {
       await signUp(email, password);
       router.replace("/(member-association)");
     } catch (err) {
-      console.error("Signup error:", err);
+      console.error("Signup error");
       if (err instanceof Error) {
         setError(err.message);
       } else if (typeof err === "object" && err !== null && "message" in err) {

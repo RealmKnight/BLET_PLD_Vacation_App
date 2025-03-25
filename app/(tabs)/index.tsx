@@ -30,7 +30,9 @@ export default function HomeScreen() {
   };
 
   const handleProfile = () => {
-    console.log("Navigating to profile from home");
+    if (process.env.NODE_ENV !== "production") {
+      console.log("Navigating to profile from home");
+    }
     router.push("/(profile)");
   };
 

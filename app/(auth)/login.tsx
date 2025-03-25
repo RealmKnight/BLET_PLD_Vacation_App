@@ -27,18 +27,25 @@ export default function LoginScreen() {
 
     setIsLoading(true);
     setError(null);
+    let loginSucceeded = false;
 
     try {
       await signIn(email, password);
+      loginSucceeded = true;
       router.replace("/(tabs)");
     } catch (err) {
-      console.error("Login error:", err);
-      if (err instanceof Error) {
-        setError(err.message);
-      } else if (typeof err === "object" && err !== null && "message" in err) {
-        setError((err as { message: string }).message);
-      } else {
-        setError("Failed to sign in. Please try again.");
+      // Only log error if login actually failed
+      if (!loginSucceeded) {
+        if (process.env.NODE_ENV !== "production") {
+          console.error("Login error");
+        }
+        if (err instanceof Error) {
+          setError(err.message);
+        } else if (typeof err === "object" && err !== null && "message" in err) {
+          setError((err as { message: string }).message);
+        } else {
+          setError("Failed to sign in. Please try again.");
+        }
       }
     } finally {
       setIsLoading(false);

@@ -12,7 +12,9 @@ export default function NotFound() {
 
     let route = member ? "/(tabs)" : user && needsMemberAssociation ? "/(member-association)" : "/(auth)";
 
-    console.log("NotFound redirecting to:", route);
+    if (process.env.NODE_ENV !== "production") {
+      console.log("NotFound redirecting to:", route);
+    }
     hasNavigated.current = true;
     router.replace(route as any);
   }, [member, isLoading, needsMemberAssociation, user]);

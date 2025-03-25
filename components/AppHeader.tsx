@@ -27,23 +27,14 @@ export function AppHeader({
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
 
-  // Debug logging for member data
-  console.log("Member data:", member);
-
   // Check if user is an admin (not just a regular user)
   const isAdmin = member?.role && ["division_admin", "union_admin", "application_admin"].includes(member.role);
   // In Expo Router, the actual route path doesn't include the group parentheses
   const isAdminRoute =
     pathname === "/application" || pathname === "/union" || pathname === "/division" || pathname.startsWith("/(admin)");
 
-  // Debug logging
-  console.log("Current pathname:", pathname);
-  console.log("Is admin route:", isAdminRoute);
-  console.log("Is admin:", isAdmin);
-
   const handleBack = () => router.back();
   const handleAdmin = () => {
-    console.log("Handling admin click, isAdminRoute:", isAdminRoute);
     if (isAdminRoute) {
       // If we're on an admin route, go to the home/tabs screen
       router.push("/(tabs)");
@@ -56,7 +47,6 @@ export function AppHeader({
     }
   };
   const handleProfile = () => {
-    console.log("Navigating to profile");
     router.push("/(profile)");
   };
   const handleLogout = async () => {
@@ -64,7 +54,7 @@ export function AppHeader({
       await signOut();
       router.replace("/(auth)/login" as any);
     } catch (error) {
-      console.error("Error signing out:", error);
+      console.error("Error signing out");
     }
   };
 

@@ -51,8 +51,6 @@ export default function TabLayout() {
               backgroundColor: "#000000",
             },
           }),
-          sceneContainerStyle: { backgroundColor: "#000000" },
-          contentStyle: { backgroundColor: "#000000" },
         }}
       >
         <Tabs.Screen

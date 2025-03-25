@@ -9,7 +9,9 @@ export default function MemberAssociationLayout() {
   // Redirect to tabs if user already has a member association
   useEffect(() => {
     if (!isLoading && member) {
-      console.log("MemberAssociationLayout: Redirecting to tabs due to existing member");
+      if (process.env.NODE_ENV !== "production") {
+        console.log("MemberAssociationLayout: Redirecting to tabs due to existing member");
+      }
       router.replace("/(tabs)");
     }
   }, [member, isLoading]);

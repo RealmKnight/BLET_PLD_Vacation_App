@@ -70,18 +70,16 @@ function RootLayoutNav() {
 
   // Add more detailed logging
   useEffect(() => {
-    console.log("RootLayoutNav state change:", {
-      hasMember: !!member,
-      hasUser: !!user,
-      hadPrevUser: !!prevUserRef.current,
-      hadPrevMember: !!prevMemberRef.current,
-      memberData: member,
-      isLoading,
-      needsMemberAssociation,
-      platform: Platform.OS,
-      timestamp: new Date().toISOString(),
-      initialLoad,
-    });
+    // Remove detailed logging with sensitive data
+    if (process.env.NODE_ENV !== "production") {
+      console.log("RootLayoutNav state change:", {
+        hasMember: !!member,
+        hasUser: !!user,
+        isLoading,
+        platform: Platform.OS,
+        initialLoad,
+      });
+    }
 
     // Update refs after logging
     prevUserRef.current = user;
@@ -121,7 +119,9 @@ function RootLayoutNav() {
 
     // Set a new timeout
     loadingTimeoutRef.current = setTimeout(() => {
-      console.log("Loading timeout reached, forcing navigation state reset");
+      if (process.env.NODE_ENV !== "production") {
+        console.log("Loading timeout reached, forcing navigation state reset");
+      }
       setIsNavigating(false);
       setInitialLoad(false);
     }, 3000); // 3 second timeout

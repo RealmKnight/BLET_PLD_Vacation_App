@@ -59,7 +59,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       states.isLoading !== isLoading;
 
     if (hasChanges) {
-      console.log("Updating auth state:", states);
+      if (process.env.NODE_ENV !== "production") {
+        console.log("Updating auth state", {
+          userId: states.user?.id ? "present" : "none",
+          memberId: states.member?.id ? "present" : "none",
+          needsAssociation: states.needsMemberAssociation,
+          loading: states.isLoading,
+        });
+      }
       setUser(states.user);
       setMember(states.member);
       setNeedsMemberAssociation(states.needsMemberAssociation);
@@ -70,19 +77,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const fetchMember = async (userId: string) => {
     // Prevent concurrent fetches
     if (isFetchingRef.current) {
-      console.log("Already fetching member data, skipping...");
+      if (process.env.NODE_ENV !== "production") {
+        console.log("Already fetching member data, skipping...");
+      }
       return;
     }
 
     // Don't fetch if we already have this member
     if (member?.id === userId) {
-      console.log("Member data already exists for user:", userId);
+      if (process.env.NODE_ENV !== "production") {
+        console.log("Member data already exists for user");
+      }
       return;
     }
 
     try {
       isFetchingRef.current = true;
-      console.log("Fetching member data for user:", userId);
+      if (process.env.NODE_ENV !== "production") {
+        console.log("Fetching member data for user");
+      }
 
       const { data: memberData, error: memberError } = await supabase
         .from("members")
@@ -91,7 +104,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .maybeSingle();
 
       if (memberError) {
-        console.error("Error fetching member:", memberError);
+        console.error("Error fetching member");
         updateAuthState({
           user,
           member: null,
@@ -102,7 +115,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (memberData) {
-        console.log("Found associated member:", memberData);
+        if (process.env.NODE_ENV !== "production") {
+          console.log("Found associated member");
+        }
         // Ensure we still have the user when setting member
         const { data: currentUser } = await supabase.auth.getUser();
         updateAuthState({
@@ -115,7 +130,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       // If we get here, we have no member data
-      console.log("No associated member found for user");
+      if (process.env.NODE_ENV !== "production") {
+        console.log("No associated member found for user");
+      }
       updateAuthState({
         user,
         member: null,
@@ -123,7 +140,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isLoading: false,
       });
     } catch (error) {
-      console.error("Unexpected error in fetchMember:", error);
+      console.error("Unexpected error in fetchMember");
       updateAuthState({
         user,
         member: null,
@@ -142,26 +159,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Debounce session checks (2 second minimum between checks)
     if (!force && timeSinceLastCheck < 2000) {
-      console.log("Skipping session check due to debounce", { timeSinceLastCheck });
+      if (process.env.NODE_ENV !== "production") {
+        console.log("Skipping session check due to debounce");
+      }
       return;
     }
 
     // Don't check if we already have both user and member unless forced
     if (!force && user && member) {
-      console.log("Already have user and member, skipping session check");
+      if (process.env.NODE_ENV !== "production") {
+        console.log("Already have user and member, skipping session check");
+      }
       return;
     }
 
     lastSessionCheckRef.current = now;
 
     try {
-      console.log("Checking for existing session...", { force });
+      if (process.env.NODE_ENV !== "production") {
+        console.log("Checking for existing session...");
+      }
       const {
         data: { session },
       } = await supabase.auth.getSession();
 
       if (session?.user) {
-        console.log("Found existing session, restoring state...");
+        if (process.env.NODE_ENV !== "production") {
+          console.log("Found existing session, restoring state...");
+        }
         // Only update state if we have a different user or force is true
         if (force || !user || user.id !== session.user.id) {
           setUser(session.user);
@@ -175,7 +200,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setIsLoading(false);
         }
       } else {
-        console.log("No valid session found");
+        if (process.env.NODE_ENV !== "production") {
+          console.log("No valid session found");
+        }
         updateAuthState({
           user: null,
           member: null,
@@ -184,7 +211,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         });
       }
     } catch (error) {
-      console.error("Error checking session:", error);
+      console.error("Error checking session");
       updateAuthState({
         user: null,
         member: null,
@@ -201,10 +228,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     async function initializeAuth() {
       try {
-        console.log("Initializing auth state...");
+        if (process.env.NODE_ENV !== "production") {
+          console.log("Initializing auth state...");
+        }
         await checkAndRestoreSession(true);
       } catch (error) {
-        console.error("Error in initializeAuth:", error);
+        console.error("Error in initializeAuth");
         updateAuthState({
           user: null,
           member: null,
@@ -221,14 +250,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      console.log("Auth state change event:", _event, {
-        hasSession: !!session,
-        userId: session?.user?.id,
-        platform: Platform.OS,
-      });
+      if (process.env.NODE_ENV !== "production") {
+        console.log("Auth state change event:", _event, {
+          hasSession: !!session,
+          platform: Platform.OS,
+        });
+      }
 
       if (!session?.user) {
-        console.log("Auth state change: No session, clearing state");
+        if (process.env.NODE_ENV !== "production") {
+          console.log("Auth state change: No session, clearing state");
+        }
         updateAuthState({
           user: null,
           member: null,
@@ -262,7 +294,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (isVisible && timeSinceLastActive > 5000) {
         // Only check if more than 5 seconds have passed
-        console.log("Tab became visible", { timeSinceLastActive });
+        if (process.env.NODE_ENV !== "production") {
+          console.log("Tab became visible", { timeSinceLastActive });
+        }
         // Only check session if we don't have both user and member
         if (!user || !member) {
           await checkAndRestoreSession(true);
@@ -286,7 +320,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Set a timeout to prevent infinite loading
     initTimeoutRef.current = setTimeout(() => {
-      console.log("Auth initialization timeout reached, resetting loading state");
+      if (process.env.NODE_ENV !== "production") {
+        console.log("Auth initialization timeout reached, resetting loading state");
+      }
       setIsLoading(false);
     }, 10000); // 10 second timeout to allow for slower connections
 
@@ -311,7 +347,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await checkAndRestoreSession(true);
       }
     } catch (error) {
-      console.error("Error signing in:", error);
+      if (process.env.NODE_ENV !== "production") {
+        console.error("Error signing in");
+      }
       throw error;
     }
   };
@@ -332,7 +370,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await fetchMember(data.user.id);
       }
     } catch (error) {
-      console.error("Error signing up:", error);
+      if (process.env.NODE_ENV !== "production") {
+        console.error("Error signing up");
+      }
       throw error;
     }
   };
@@ -341,7 +381,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const { error } = await supabase.auth.signOut();
       if (error) {
-        console.error("Error signing out:", error);
+        if (process.env.NODE_ENV !== "production") {
+          console.error("Error signing out");
+        }
         if (error.message.includes("Session from session_id claim in JWT does not exist")) {
           updateAuthState({
             user: null,
@@ -360,7 +402,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isLoading: false,
       });
     } catch (error) {
-      console.error("Error signing out:", error);
+      if (process.env.NODE_ENV !== "production") {
+        console.error("Error signing out");
+      }
       updateAuthState({
         user: null,
         member: null,
@@ -373,7 +417,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const associateMember = async (pin: string) => {
     try {
-      console.log("Starting member association with PIN:", pin);
+      if (process.env.NODE_ENV !== "production") {
+        console.log("Starting member association with PIN");
+      }
       const { data: memberData, error: memberError } = await supabase
         .from("members")
         .select("*")
@@ -388,7 +434,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (!memberData) {
-        console.log("No member found with PIN:", pin);
+        if (process.env.NODE_ENV !== "production") {
+          console.log("No member found with PIN");
+        }
         throw new Error("Invalid PIN or member already associated");
       }
 
@@ -414,7 +462,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw updateError;
       }
 
-      console.log("Successfully associated member, updating state");
+      if (process.env.NODE_ENV !== "production") {
+        console.log("Successfully associated member, updating state");
+      }
       updateAuthState({
         user: currentUser.user,
         member: { ...memberData, id: currentUser.user.id },

@@ -24,22 +24,24 @@ export default function ProfileScreen() {
   const isMobile = width < 768;
 
   // Add debugging logs
-  console.log("Profile Data:", {
-    user: user
-      ? {
-          id: user.id,
-          email: user.email,
-          phone: user.phone,
-        }
-      : null,
-    member: member
-      ? {
-          first_name: member.first_name,
-          last_name: member.last_name,
-          pin_number: member.pin_number,
-        }
-      : null,
-  });
+  if (process.env.NODE_ENV !== "production") {
+    console.log("Profile Data:", {
+      user: user
+        ? {
+            id: user.id,
+            email: user.email,
+            phone: user.phone,
+          }
+        : null,
+      member: member
+        ? {
+            first_name: member.first_name,
+            last_name: member.last_name,
+            pin_number: member.pin_number,
+          }
+        : null,
+    });
+  }
 
   const [isEditing, setIsEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -102,7 +104,7 @@ export default function ProfileScreen() {
       }
       setIsEditing(false);
     } catch (err) {
-      console.error("Profile update error:", err);
+      console.error("Profile update error");
       if (err instanceof Error) {
         setError(err.message);
       } else {

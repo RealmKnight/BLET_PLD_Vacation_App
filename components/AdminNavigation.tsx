@@ -34,11 +34,13 @@ export function AdminNavigation() {
   const isSmallMobile = width < 480;
   const [isTransitioning, setIsTransitioning] = useState(false);
 
-  console.log("AdminNavigation rendering with:", {
-    pathname,
-    memberRole: member?.role,
-    isVisible: !!member?.role,
-  });
+  if (process.env.NODE_ENV !== "production") {
+    console.log("AdminNavigation rendering with:", {
+      pathname,
+      memberRole: member?.role,
+      isVisible: !!member?.role,
+    });
+  }
 
   if (!member?.role) return null;
 
@@ -49,7 +51,9 @@ export function AdminNavigation() {
   };
 
   const accessibleRoutes = allowedRoutes[member.role as AdminRole] || [];
-  console.log("Available routes for role:", accessibleRoutes);
+  if (process.env.NODE_ENV !== "production") {
+    console.log("Available routes for role:", accessibleRoutes);
+  }
 
   // Get title for current section
   const getCurrentTitle = () => {
@@ -89,7 +93,9 @@ export function AdminNavigation() {
         {accessibleRoutes.map((route) => {
           const routePath = ADMIN_ROUTES[route].path;
           const isActive = pathname.includes(route);
-          console.log(`Route ${route}: isActive=${isActive}, path=${routePath}`);
+          if (process.env.NODE_ENV !== "production") {
+            console.log(`Route ${route}: isActive=${isActive}, path=${routePath}`);
+          }
           return (
             <Pressable
               key={route}

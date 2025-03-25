@@ -57,9 +57,11 @@ export default function AdminLayout() {
     currentRoute = segments[segments.length - 1];
   }
 
-  console.log("AdminLayout - Current pathname:", pathname);
-  console.log("AdminLayout - Extracted route:", currentRoute);
-  console.log("AdminLayout - Accessible routes:", accessibleRoutes);
+  if (process.env.NODE_ENV !== "production") {
+    console.log("AdminLayout - Current pathname:", pathname);
+    console.log("AdminLayout - Extracted route:", currentRoute);
+    console.log("AdminLayout - Accessible routes:", accessibleRoutes);
+  }
 
   // If trying to access unauthorized route, redirect to first allowed route or home
   if (currentRoute && !accessibleRoutes.includes(currentRoute)) {

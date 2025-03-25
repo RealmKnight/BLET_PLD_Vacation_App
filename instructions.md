@@ -67,20 +67,112 @@ Each division may assign the following **officer positions**, managed by the **D
 
 ### **4. Calendars**
 
-#### **PLD/SDV Calendar**
+## **PLD/SDV Calendar**
 
-Each division maintains a **Personal Leave Day (PLD) and Single Vacation Day (SVD) Calendar**, displaying availability with **color-coded status**:
+### **1. Objectives**
 
-- **Grey** - Past dates (not selectable).
-- **Red** - Next 2 days (requests locked).
-- **Green** - Future dates (open for requests, 2+ spots available).
-- **Yellow** - Limited availability (1-2 spots left).
-- **Red** - Fully booked, waitlist option available.
+- Provide a real-time, color-coded calendar for PLD/SDV availability.
+- Enable union members to request PLD/SDV with a first-come, first-served system.
+- Allow Division Admins to manage daily/weekly allotments dynamically.
+- Support waitlists for full dates based on seniority.
+- Ensure RBAC enforcement (Admins, Local Chairmen, and Members).
 
-> **Implementation Notes:**
->
-> - **Daily availability quotas** are managed by **Division Admins**.
-> - Users can submit **waitlist requests** for fully booked days.
+### **2. User Roles & Permissions**
+
+| **Role**              | **Permissions**                                                                                          |
+| --------------------- | -------------------------------------------------------------------------------------------------------- |
+| **Union Member**      | View PLD/SDV calendar, submit requests, cancel pending requests, view approvals/denials, join waitlists. |
+| **Local Chairman**    | Approve/deny PLD/SDV requests, manage waitlists, escalate to Division Admins.                            |
+| **Division Admin**    | Manage PLD/SDV allotments, override approvals/denials, adjust quotas dynamically.                        |
+| **Application Admin** | Manage users, divisions, and system-wide settings.                                                       |
+
+### **3. Functional Requirements**
+
+#### **3.1 PLD/SDV Request Flow**
+
+1. User selects a **date** on the calendar.
+2. System displays **available PLD/SDV slots** for that date.
+3. If slots are available:
+   - User submits a request.
+   - Application auto-approves unless there are conflicts/multiple requests at the same time, then the Local Chairman reviews and approves/denies it.
+   - If approved, the request is confirmed, and the user is notified.
+4. If slots are full:
+   - User may **join a waitlist** (ranked by request time and seniority).
+   - If a spot opens, the top-ranked user is automatically assigned the slot.
+5. Requests must be made **at least 48 hours in advance**.
+6. Requests are **locked once approved**, unless changed by the Local Chairman.
+
+#### **3.2 PLD/SDV Calendar**
+
+- **Color-coded availability**:
+  - 🟢 **Green** = Available slots
+  - 🟡 **Yellow** = Limited slots
+  - 🔴 **Red** = Full (waitlist available)
+- Users can request either **PLD or SDV** (allotment is shared between the two day types, but all days must be tracked by type).
+- Division Admins can **adjust allotments dynamically** (daily, weekly, monthly, and yearly).
+
+#### **3.3 Seniority-Based PLD Allocation**
+
+- PLD entitlement is based on **Company Hire Date** (stored in `members` table).
+- System calculates maximum PLDs per year using the following rules:
+
+| **Years of Service** | **Max PLDs** |
+| -------------------- | ------------ |
+| 1 to <3 years        | 5            |
+| 3 to <6 years        | 8            |
+| 6 to <10 years       | 11           |
+| 10+ years            | 13           |
+
+- Division Admins can **manually override PLD entitlements** in special cases.
+
+#### **3.4 Notifications System**
+
+- **Email & in-app alerts** for:
+  - Request approval/denial
+  - Waitlist promotion
+  - Admin changes to allotments
+
+### **4. Data Model (Supabase)**
+
+#### **4.1 Tables**
+
+##### **Divisions**
+
+- `id` (Integer, PK)
+- `name` (String)
+
+##### **PLD_SDV_Requests**
+
+- `id` (UUID, PK)
+- `member_id` (UUID, FK -> Members)
+- `division_id` (Integer, FK -> Divisions)
+- `request_date` (Date)
+- `type` (Enum: "PLD", "SDV")
+- `status` (Enum: "pending", "approved", "denied", "waitlisted")
+- `requested_at` (Timestamp)
+
+##### **PLD_SDV_Allotments**
+
+- `id` (UUID, PK)
+- `division_id` (Integer, FK -> Divisions)
+- `date` (Date)
+- `max_allotment` (Integer)
+- `current_requests` (Integer)
+
+### **5. Tech Stack & Implementation**
+
+- **Framework**: Expo (React Native)
+- **Navigation**: Expo Router
+- **UI Styling**: NativeWind
+- **State Management**: Zustand (or React Context)
+- **Backend**: Supabase (Auth, Database, RBAC)
+- **Deployment**: Coolify
+
+### **6. Future Enhancements**
+
+- **Automated PLD/SVD payouts** based on denied requests.
+- **Bulk approvals** for Local Chairmen.
+- **Integration with payroll** for payment tracking of days requested to be paid in lieu.
 
 #### **Full-Week Vacation Calendar**
 

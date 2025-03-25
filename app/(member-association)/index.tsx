@@ -21,7 +21,9 @@ export default function MemberAssociationScreen() {
 
   useEffect(() => {
     if (member) {
-      console.log("MemberAssociationScreen: Member data detected, redirecting to tabs", { member });
+      if (process.env.NODE_ENV !== "production") {
+        console.log("MemberAssociationScreen: Member data detected, redirecting to tabs");
+      }
       router.replace("/(tabs)");
     }
   }, [member]);
@@ -36,11 +38,15 @@ export default function MemberAssociationScreen() {
     setError(null);
 
     try {
-      console.log("MemberAssociationScreen: Attempting to associate member with PIN:", pin);
+      if (process.env.NODE_ENV !== "production") {
+        console.log("MemberAssociationScreen: Attempting to associate member with PIN");
+      }
       await associateMember(pin);
-      console.log("MemberAssociationScreen: Successfully associated member");
+      if (process.env.NODE_ENV !== "production") {
+        console.log("MemberAssociationScreen: Successfully associated member");
+      }
     } catch (err) {
-      console.error("MemberAssociationScreen: Error associating member:", err);
+      console.error("MemberAssociationScreen: Error associating member");
       if (err instanceof Error) {
         setError(err.message);
         setShowContactAdmin(true);
