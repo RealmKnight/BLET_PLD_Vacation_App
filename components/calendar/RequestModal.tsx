@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { View, Text, Modal, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator } from "react-native";
-import { format, addDays, addMonths, isBefore, isAfter, startOfDay } from "date-fns";
+import { format, addDays, addMonths, isBefore, isAfter, startOfDay, parseISO } from "date-fns";
 import { supabase } from "@/lib/supabase";
 
 // Define types for allocation data
@@ -34,6 +34,9 @@ export function RequestModal({ visible, date, division, onClose, onSubmit }: Req
   // Calculate the allowed date range
   const dateRanges = useMemo(() => {
     const today = startOfDay(new Date());
+    // Set time to noon to avoid timezone issues
+    today.setHours(12, 0, 0, 0);
+
     return {
       minAllowedDate: addDays(today, 2), // Min: current date + 2 days (48 hours)
       maxAllowedDate: addMonths(today, 6), // Max: current date + 6 months
@@ -44,8 +47,13 @@ export function RequestModal({ visible, date, division, onClose, onSubmit }: Req
   const dateStatus = useMemo(() => {
     if (!date) return { isEligible: false, isTooEarly: false, isTooLate: false };
 
-    const isTooEarly = isBefore(date, dateRanges.minAllowedDate);
-    const isTooLate = isAfter(date, dateRanges.maxAllowedDate);
+    // Make a copy of date to avoid modifying the original
+    const normalizedDate = new Date(date);
+    // Set time to noon to avoid timezone issues
+    normalizedDate.setHours(12, 0, 0, 0);
+
+    const isTooEarly = isBefore(normalizedDate, dateRanges.minAllowedDate);
+    const isTooLate = isAfter(normalizedDate, dateRanges.maxAllowedDate);
     const isEligible = !isTooEarly && !isTooLate;
 
     return { isEligible, isTooEarly, isTooLate };
@@ -60,7 +68,10 @@ export function RequestModal({ visible, date, division, onClose, onSubmit }: Req
       setError(null);
 
       try {
-        const formattedDate = format(date, "yyyy-MM-dd");
+        // Ensure date is normalized for consistent formatting
+        const normalizedDate = new Date(date);
+        normalizedDate.setHours(12, 0, 0, 0);
+        const formattedDate = format(normalizedDate, "yyyy-MM-dd");
 
         // 1. Get max allotment for the date
         const { data: allotmentData, error: allotmentError } = await supabase

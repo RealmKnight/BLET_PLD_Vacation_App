@@ -1,16 +1,24 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, Image, Platform, ScrollView } from "react-native";
-import { format, addDays, addMonths, isBefore, isAfter, startOfDay } from "date-fns";
+import { format, addDays, addMonths, isBefore, isAfter, startOfDay, parseISO } from "date-fns";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Calendar } from "@/components/calendar/Calendar";
 import { RequestModal } from "@/components/calendar/RequestModal";
 import { AppHeader } from "@/components/AppHeader";
 import { getCurrentMember } from "@/lib/supabase";
+import { TextInput } from "react-native";
 
 export default function CalendarScreen() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [currentViewDate, setCurrentViewDate] = useState<Date>(() => {
+    // Initialize with noon to avoid timezone issues
+    const today = new Date();
+    today.setHours(12, 0, 0, 0);
+    return today;
+  });
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [userDivision, setUserDivision] = useState<string>("174"); // Default to division 174 but will be updated
+  const [dateInputValue, setDateInputValue] = useState<string>("");
 
   // Fetch the user's division when component mounts
   useEffect(() => {
@@ -31,6 +39,9 @@ export default function CalendarScreen() {
   // Calculate the allowed date range
   const dateRanges = useMemo(() => {
     const today = startOfDay(new Date());
+    // Set time to noon to avoid timezone issues
+    today.setHours(12, 0, 0, 0);
+
     return {
       minAllowedDate: addDays(today, 2), // Min: current date + 2 days (48 hours)
       maxAllowedDate: addMonths(today, 6), // Max: current date + 6 months
@@ -49,6 +60,8 @@ export default function CalendarScreen() {
   }, [selectedDate, dateRanges]);
 
   const handleDateSelect = (date: Date) => {
+    // Make sure to set the time to noon to avoid timezone issues
+    date.setHours(12, 0, 0, 0);
     setSelectedDate(date);
   };
 
@@ -66,6 +79,35 @@ export default function CalendarScreen() {
     setIsModalVisible(false);
   };
 
+  const handleJumpToDate = () => {
+    try {
+      // Check if the input is a valid date format (yyyy-MM-dd)
+      if (/^\d{4}-\d{2}-\d{2}$/.test(dateInputValue)) {
+        const newDate = parseISO(dateInputValue);
+
+        // Set time to noon to avoid timezone issues
+        newDate.setHours(12, 0, 0, 0);
+
+        if (!isNaN(newDate.getTime())) {
+          setCurrentViewDate(newDate);
+          setSelectedDate(newDate);
+          setDateInputValue("");
+        }
+      }
+    } catch (error) {
+      console.error("Invalid date format:", error);
+    }
+  };
+
+  const handleGoToToday = () => {
+    const today = new Date();
+    // Set time to noon to avoid timezone issues
+    today.setHours(12, 0, 0, 0);
+
+    setCurrentViewDate(today);
+    setSelectedDate(today);
+  };
+
   return (
     <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
       <View style={styles.container}>
@@ -81,8 +123,31 @@ export default function CalendarScreen() {
             <Text style={styles.title}>PLD/SDV Calendar</Text>
           </View>
 
+          <View style={styles.calendarNavigation}>
+            <View style={styles.dateInputContainer}>
+              <TextInput
+                style={styles.dateInput}
+                placeholder="YYYY-MM-DD"
+                placeholderTextColor="#666"
+                value={dateInputValue}
+                onChangeText={setDateInputValue}
+                onSubmitEditing={handleJumpToDate}
+              />
+              <TouchableOpacity style={styles.jumpButton} onPress={handleJumpToDate}>
+                <Text style={styles.jumpButtonText}>Jump to Date</Text>
+              </TouchableOpacity>
+            </View>
+            <TouchableOpacity style={styles.todayButton} onPress={handleGoToToday}>
+              <Text style={styles.todayButtonText}>Today</Text>
+            </TouchableOpacity>
+          </View>
+
           <View style={styles.calendarContainer}>
-            <Calendar onSelectDate={handleDateSelect} />
+            <Calendar
+              onSelectDate={handleDateSelect}
+              currentViewDate={currentViewDate}
+              onChangeViewDate={setCurrentViewDate}
+            />
           </View>
 
           {selectedDate && dateStatus.isEligible && (
@@ -150,6 +215,50 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     color: "#BAC42A",
     textAlign: "center",
+  },
+  calendarNavigation: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  dateInputContainer: {
+    flex: 1,
+    flexDirection: "row",
+    marginRight: 8,
+  },
+  dateInput: {
+    backgroundColor: "#111111",
+    borderWidth: 1,
+    borderColor: "#333333",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    color: "#FFFFFF",
+    flex: 1,
+    marginRight: 8,
+  },
+  jumpButton: {
+    backgroundColor: "#333333",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    justifyContent: "center",
+  },
+  jumpButtonText: {
+    color: "#FFFFFF",
+    fontWeight: "500",
+  },
+  todayButton: {
+    backgroundColor: "#BAC42A",
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    justifyContent: "center",
+  },
+  todayButtonText: {
+    color: "#000000",
+    fontWeight: "600",
   },
   calendarContainer: {
     backgroundColor: "#000000",

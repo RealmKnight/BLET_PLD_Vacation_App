@@ -1,20 +1,33 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { View, Text, ActivityIndicator, StyleSheet } from "react-native";
 import { Calendar as RNCalendar, DateData } from "react-native-calendars";
-import { format, addDays, addMonths, isBefore, isAfter, startOfDay, isEqual, isSameMonth } from "date-fns";
+import { format, addDays, addMonths, isBefore, isAfter, startOfDay, isEqual, isSameMonth, parseISO } from "date-fns";
 
 import { useCalendarAllotments } from "@/hooks/useCalendarAllotments";
 
 interface CalendarProps {
   onSelectDate?: (date: Date) => void;
+  currentViewDate?: Date;
+  onChangeViewDate?: (date: Date) => void;
 }
 
-export function Calendar({ onSelectDate }: CalendarProps) {
-  const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [selectedDate, setSelectedDate] = useState(format(new Date(), "yyyy-MM-dd"));
+export function Calendar({ onSelectDate, currentViewDate, onChangeViewDate }: CalendarProps) {
+  const [currentMonth, setCurrentMonth] = useState(currentViewDate || new Date());
+  const [selectedDate, setSelectedDate] = useState(format(currentViewDate || new Date(), "yyyy-MM-dd"));
   const [markedDates, setMarkedDates] = useState<any>({});
 
   const { allotments, isLoading, error } = useCalendarAllotments(currentMonth);
+
+  // Update internal state when currentViewDate prop changes
+  useEffect(() => {
+    if (currentViewDate) {
+      setCurrentMonth(currentViewDate);
+      // Only update selected date if it's a new date (to prevent overriding user selections)
+      if (!isSameMonth(currentViewDate, currentMonth)) {
+        setSelectedDate(format(currentViewDate, "yyyy-MM-dd"));
+      }
+    }
+  }, [currentViewDate]);
 
   // Calculate the minimum and maximum allowed request dates
   const dateRanges = useMemo(() => {
@@ -101,7 +114,12 @@ export function Calendar({ onSelectDate }: CalendarProps) {
 
   const handleDateSelect = (day: DateData) => {
     const dateStr = day.dateString;
-    const selectedDateObj = new Date(dateStr);
+
+    // Use parseISO to ensure proper date parsing with timezone handling
+    const selectedDateObj = parseISO(dateStr);
+
+    // Set time to noon to avoid timezone issues
+    selectedDateObj.setHours(12, 0, 0, 0);
 
     // Only allow selection of eligible dates
     if (isDateEligibleForRequest(selectedDateObj)) {
@@ -117,7 +135,15 @@ export function Calendar({ onSelectDate }: CalendarProps) {
   const handleMonthChange = (monthData: DateData) => {
     // Create a new Date object for the first day of the selected month
     const newDate = new Date(monthData.year, monthData.month - 1, 1);
+    // Set time to noon to avoid timezone issues
+    newDate.setHours(12, 0, 0, 0);
+
     setCurrentMonth(newDate);
+
+    // Notify parent component about the month change
+    if (onChangeViewDate) {
+      onChangeViewDate(newDate);
+    }
   };
 
   const renderLegend = () => (
@@ -150,7 +176,12 @@ export function Calendar({ onSelectDate }: CalendarProps) {
     }
 
     const allotment = allotments[selectedDate];
-    const selectedDateObj = new Date(selectedDate);
+
+    // Use parseISO to ensure proper date parsing with timezone handling
+    const selectedDateObj = parseISO(selectedDate);
+    // Set time to noon to avoid timezone issues
+    selectedDateObj.setHours(12, 0, 0, 0);
+
     const isEligible = isDateEligibleForRequest(selectedDateObj);
     const isTooEarly = isBefore(selectedDateObj, dateRanges.minAllowedDate);
     const isTooLate = isAfter(selectedDateObj, dateRanges.maxAllowedDate);
