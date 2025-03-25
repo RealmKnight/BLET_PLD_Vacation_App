@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { differenceInYears } from "date-fns";
 import { supabase } from "@/lib/supabase";
 import { getCurrentMember } from "@/lib/supabase";
+import { normalizeDate } from "@/utils/date";
 
 // Types for the hook
 export interface TimeStats {
@@ -64,7 +65,7 @@ export function useMyTime() {
 
     if (!hireDate) return 0;
 
-    const yearsOfService = differenceInYears(new Date(), new Date(hireDate));
+    const yearsOfService = differenceInYears(normalizeDate(new Date()), normalizeDate(hireDate));
 
     if (yearsOfService < 1) return 0;
     if (yearsOfService < 3) return 5;

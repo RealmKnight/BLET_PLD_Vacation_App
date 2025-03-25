@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
-import { addDays, format, startOfMonth, endOfMonth } from "date-fns";
+import { useEffect, useState, useCallback } from "react";
+import { startOfMonth, endOfMonth } from "date-fns";
 import { supabase } from "@/lib/supabase";
 import { getCurrentMember } from "@/lib/supabase";
+import { formatDateToYMD, normalizeDate } from "@/utils/date";
 
 export type DayAllotment = {
   date: string;
@@ -23,6 +24,56 @@ export function useCalendarAllotments(month: Date) {
     return "available";
   };
 
+  const fetchAllotments = useCallback(async () => {
+    if (!userDivision) return;
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      // Get start and end of month, normalized to UTC noon
+      const start = normalizeDate(startOfMonth(month));
+      const end = normalizeDate(endOfMonth(month));
+
+      // Format as YYYY-MM-DD
+      const startDate = formatDateToYMD(start);
+      const endDate = formatDateToYMD(end);
+
+      // Fetch allotments from Supabase
+      const { data, error } = await supabase
+        .from("pld_sdv_allotments")
+        .select("*")
+        .eq("division", userDivision)
+        .gte("date", startDate)
+        .lte("date", endDate);
+
+      if (error) throw error;
+
+      // Create a map of date to allotment data
+      const allotmentMap: Record<string, DayAllotment> = {};
+
+      // Process allotments from the database
+      if (data) {
+        data.forEach((item) => {
+          const dateStr = formatDateToYMD(item.date);
+          allotmentMap[dateStr] = {
+            date: dateStr,
+            maxAllotment: item.max_allotment,
+            currentRequests: item.current_requests || 0,
+            availability: getAvailability(item.max_allotment, item.current_requests || 0),
+          };
+        });
+      }
+
+      setAllotments(allotmentMap);
+    } catch (err: any) {
+      console.error("Error fetching allotments:", err);
+      setError(err.message || "Failed to load allotments");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [month, userDivision]);
+
   useEffect(() => {
     async function loadUserDivision() {
       try {
@@ -40,71 +91,10 @@ export function useCalendarAllotments(month: Date) {
   }, []);
 
   useEffect(() => {
-    if (!userDivision) return;
-
-    async function fetchAllotments() {
-      setIsLoading(true);
-      setError(null);
-
-      try {
-        // Get start and end of month
-        const start = startOfMonth(month);
-        const end = endOfMonth(month);
-
-        // Format as YYYY-MM-DD
-        const startDate = format(start, "yyyy-MM-dd");
-        const endDate = format(end, "yyyy-MM-dd");
-
-        // Fetch allotments from Supabase
-        const { data, error } = await supabase
-          .from("pld_sdv_allotments")
-          .select("*")
-          .eq("division", userDivision as string)
-          .gte("date", startDate)
-          .lte("date", endDate);
-
-        if (error) throw error;
-
-        // Create a map of date to allotment data
-        const allotmentMap: Record<string, DayAllotment> = {};
-
-        // First build default allotments (0 for all dates in month)
-        let currentDate = start;
-        while (currentDate <= end) {
-          const dateStr = format(currentDate, "yyyy-MM-dd");
-          allotmentMap[dateStr] = {
-            date: dateStr,
-            maxAllotment: 0,
-            currentRequests: 0,
-            availability: "full", // Default to full if no allotment record exists
-          };
-          currentDate = addDays(currentDate, 1);
-        }
-
-        // Then fill in actual allotments from the database
-        if (data) {
-          data.forEach((item) => {
-            const dateStr = format(new Date(item.date), "yyyy-MM-dd");
-            allotmentMap[dateStr] = {
-              date: dateStr,
-              maxAllotment: item.max_allotment,
-              currentRequests: item.current_requests || 0,
-              availability: getAvailability(item.max_allotment, item.current_requests || 0),
-            };
-          });
-        }
-
-        setAllotments(allotmentMap);
-      } catch (err: any) {
-        console.error("Error fetching allotments:", err);
-        setError(err.message || "Failed to load allotments");
-      } finally {
-        setIsLoading(false);
-      }
+    if (userDivision) {
+      fetchAllotments();
     }
+  }, [fetchAllotments, userDivision]);
 
-    fetchAllotments();
-  }, [month, userDivision]);
-
-  return { allotments, isLoading, error, userDivision };
+  return { allotments, isLoading, error, userDivision, refresh: fetchAllotments };
 }

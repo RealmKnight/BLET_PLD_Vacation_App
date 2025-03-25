@@ -1,7 +1,9 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { View, Text, Modal, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator } from "react-native";
+import { View, Text, Modal, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Alert } from "react-native";
 import { format, addDays, addMonths, isBefore, isAfter, startOfDay, parseISO } from "date-fns";
 import { supabase } from "@/lib/supabase";
+import { useTimeOffRequests } from "@/hooks/useTimeOffRequests";
+import { useMyTime } from "@/hooks/useMyTime";
 
 // Define types for allocation data
 type MemberRequest = {
@@ -9,6 +11,7 @@ type MemberRequest = {
   first_name: string | null;
   last_name: string | null;
   leave_type: "PLD" | "SDV";
+  status: "pending" | "approved" | "denied" | "waitlisted";
 };
 
 type AllocationSlot = {
@@ -30,6 +33,9 @@ export function RequestModal({ visible, date, division, onClose, onSubmit }: Req
   const [loading, setLoading] = useState(false);
   const [maxAllotment, setMaxAllotment] = useState(6); // Default to 6 until we fetch the real value
   const [error, setError] = useState<string | null>(null);
+
+  const { timeStats } = useMyTime();
+  const { submitRequest, isSubmitting } = useTimeOffRequests();
 
   // Calculate the allowed date range
   const dateRanges = useMemo(() => {
@@ -59,116 +65,151 @@ export function RequestModal({ visible, date, division, onClose, onSubmit }: Req
     return { isEligible, isTooEarly, isTooLate };
   }, [date, dateRanges]);
 
-  // Load allocation and requests data for the selected date
-  useEffect(() => {
-    async function fetchAllocations() {
-      if (!date || !division || !visible) return;
+  const canSubmitRequest = useMemo(() => {
+    if (!date || !dateStatus.isEligible) return false;
 
-      setLoading(true);
-      setError(null);
-
-      try {
-        // Ensure date is normalized for consistent formatting
-        const normalizedDate = new Date(date);
-        normalizedDate.setHours(12, 0, 0, 0);
-        const formattedDate = format(normalizedDate, "yyyy-MM-dd");
-
-        // 1. Get max allotment for the date
-        const { data: allotmentData, error: allotmentError } = await supabase
-          .from("pld_sdv_allotments")
-          .select("max_allotment")
-          .eq("date", formattedDate)
-          .eq("division", division)
-          .single();
-
-        if (allotmentError && allotmentError.code !== "PGRST116") {
-          console.error("Error fetching allotment:", allotmentError);
-          setError("Failed to load allotment data.");
-        }
-
-        const slots = allotmentData?.max_allotment || maxAllotment;
-        setMaxAllotment(slots);
-
-        // 2. Get existing requests for this date
-        const { data: requestsData, error: requestsError } = await supabase
-          .from("pld_sdv_requests")
-          .select(
-            `
-            id, 
-            leave_type,
-            member_id,
-            status
-          `
-          )
-          .eq("request_date", formattedDate)
-          .eq("division", division)
-          .eq("status", "approved")
-          .order("requested_at", { ascending: true });
-
-        if (requestsError) {
-          console.error("Error fetching requests:", requestsError);
-          setError("Failed to load request data.");
-        }
-
-        // 3. Get member info for each request
-        const memberRequests = [];
-        if (requestsData && requestsData.length > 0) {
-          for (const request of requestsData) {
-            const { data: memberData, error: memberError } = await supabase
-              .from("members")
-              .select("first_name, last_name")
-              .eq("id", request.member_id)
-              .single();
-
-            if (memberError) {
-              console.error("Error fetching member:", memberError);
-              continue;
-            }
-
-            memberRequests.push({
-              id: request.member_id,
-              first_name: memberData?.first_name || "Unknown",
-              last_name: memberData?.last_name || "Member",
-              leave_type: request.leave_type,
-            });
-          }
-        }
-
-        // 4. Build the allocations list
-        const allocationsList: AllocationSlot[] = [];
-        for (let i = 0; i < slots; i++) {
-          if (memberRequests && i < memberRequests.length) {
-            allocationsList.push({
-              position: i + 1,
-              member: memberRequests[i],
-            });
-          } else {
-            // Empty slot
-            allocationsList.push({
-              position: i + 1,
-              member: null,
-            });
-          }
-        }
-
-        setAllocations(allocationsList);
-      } catch (error) {
-        console.error("Error in fetchAllocations:", error);
-        setError("An error occurred while loading the data.");
-      } finally {
-        setLoading(false);
-      }
+    // Check if there are available slots
+    const currentAllocations = allocations.filter((a) => a.member).length;
+    if (currentAllocations >= maxAllotment) {
+      return false;
     }
 
+    // Check if user has available days
+    if (requestType === "PLD") {
+      return timeStats.available.pld > 0;
+    } else {
+      return timeStats.available.sdv > 0;
+    }
+  }, [date, dateStatus.isEligible, allocations, maxAllotment, requestType, timeStats]);
+
+  // Load allocation and requests data for the selected date
+  const fetchAllocations = async () => {
+    if (!date || !division || !visible) return;
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      // Ensure date is normalized for consistent formatting
+      const normalizedDate = new Date(date);
+      normalizedDate.setHours(12, 0, 0, 0);
+      const formattedDate = format(normalizedDate, "yyyy-MM-dd");
+
+      // 1. Get max allotment for the date
+      const { data: allotmentData, error: allotmentError } = await supabase
+        .from("pld_sdv_allotments")
+        .select("max_allotment")
+        .eq("date", formattedDate)
+        .eq("division", division)
+        .single();
+
+      if (allotmentError && allotmentError.code !== "PGRST116") {
+        console.error("Error fetching allotment:", allotmentError);
+        setError("Failed to load allotment data.");
+      }
+
+      const slots = allotmentData?.max_allotment || maxAllotment;
+      setMaxAllotment(slots);
+
+      // 2. Get existing requests for this date (both pending and approved)
+      const { data: requestsData, error: requestsError } = await supabase
+        .from("pld_sdv_requests")
+        .select(
+          `
+          id, 
+          leave_type,
+          member_id,
+          status
+        `
+        )
+        .eq("request_date", formattedDate)
+        .eq("division", division)
+        .in("status", ["pending", "approved"])
+        .order("requested_at", { ascending: true });
+
+      if (requestsError) {
+        console.error("Error fetching requests:", requestsError);
+        setError("Failed to load request data.");
+      }
+
+      // 3. Get member info for each request
+      const memberRequests = [];
+      if (requestsData && requestsData.length > 0) {
+        for (const request of requestsData) {
+          const { data: memberData, error: memberError } = await supabase
+            .from("members")
+            .select("first_name, last_name")
+            .eq("id", request.member_id)
+            .single();
+
+          if (memberError) {
+            console.error("Error fetching member:", memberError);
+            continue;
+          }
+
+          memberRequests.push({
+            id: request.member_id,
+            first_name: memberData?.first_name || "Unknown",
+            last_name: memberData?.last_name || "Member",
+            leave_type: request.leave_type,
+            status: request.status,
+          });
+        }
+      }
+
+      // 4. Build the allocations list
+      const allocationsList: AllocationSlot[] = [];
+      for (let i = 0; i < slots; i++) {
+        if (memberRequests && i < memberRequests.length) {
+          allocationsList.push({
+            position: i + 1,
+            member: memberRequests[i],
+          });
+        } else {
+          // Empty slot
+          allocationsList.push({
+            position: i + 1,
+            member: null,
+          });
+        }
+      }
+
+      setAllocations(allocationsList);
+    } catch (error) {
+      console.error("Error in fetchAllocations:", error);
+      setError("An error occurred while loading the data.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchAllocations();
   }, [date, division, visible]);
 
-  const handleSubmit = () => {
-    // Double-check date eligibility before submission
-    if (date && dateStatus.isEligible) {
+  const handleSubmit = async () => {
+    if (!date || !dateStatus.isEligible || !canSubmitRequest) {
+      if (!canSubmitRequest) {
+        if (requestType === "PLD" && timeStats.available.pld <= 0) {
+          Alert.alert("No PLD Days Available", "You have used all your available PLD days.");
+        } else if (requestType === "SDV" && timeStats.available.sdv <= 0) {
+          Alert.alert("No SDV Days Available", "You have used all your available SDV days.");
+        } else {
+          Alert.alert("No Slots Available", "All slots for this date have been filled.");
+        }
+      }
+      return;
+    }
+
+    const result = await submitRequest(date, requestType, division);
+    if (result) {
+      // Wait a short moment to ensure the database has processed the request
+      setTimeout(async () => {
+        await fetchAllocations();
+      }, 500);
+
+      // Notify parent
       onSubmit(requestType);
-    } else {
-      onClose();
     }
   };
 
@@ -215,9 +256,16 @@ export function RequestModal({ visible, date, division, onClose, onSubmit }: Req
                   {slot.member.first_name} {slot.member.last_name}
                 </Text>
                 <View
-                  style={[styles.leaveTypeBadge, slot.member.leave_type === "PLD" ? styles.pldBadge : styles.sdvBadge]}
+                  style={[
+                    styles.leaveTypeBadge,
+                    slot.member.leave_type === "PLD" ? styles.pldBadge : styles.sdvBadge,
+                    slot.member.status === "pending" && styles.pendingBadge,
+                  ]}
                 >
-                  <Text style={styles.leaveTypeText}>{slot.member.leave_type}</Text>
+                  <Text style={styles.leaveTypeText}>
+                    {slot.member.leave_type}
+                    {slot.member.status === "pending" ? " (Pending)" : ""}
+                  </Text>
                 </View>
               </View>
             ) : (
@@ -239,21 +287,46 @@ export function RequestModal({ visible, date, division, onClose, onSubmit }: Req
 
           <View style={styles.typeSelector}>
             <TouchableOpacity
-              style={[styles.typeButton, requestType === "PLD" && styles.typeButtonSelected]}
+              style={[
+                styles.typeButton,
+                requestType === "PLD" && styles.typeButtonSelected,
+                timeStats.available.pld <= 0 && styles.typeButtonDisabled,
+              ]}
               onPress={() => setRequestType("PLD")}
+              disabled={timeStats.available.pld <= 0}
             >
-              <Text style={[styles.typeButtonText, requestType === "PLD" && styles.typeButtonTextSelected]}>PLD</Text>
+              <Text
+                style={[
+                  styles.typeButtonText,
+                  requestType === "PLD" && styles.typeButtonTextSelected,
+                  timeStats.available.pld <= 0 && styles.typeButtonTextDisabled,
+                ]}
+              >
+                PLD ({timeStats.available.pld} left)
+              </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.typeButton, requestType === "SDV" && styles.typeButtonSelected]}
+              style={[
+                styles.typeButton,
+                requestType === "SDV" && styles.typeButtonSelected,
+                timeStats.available.sdv <= 0 && styles.typeButtonDisabled,
+              ]}
               onPress={() => setRequestType("SDV")}
+              disabled={timeStats.available.sdv <= 0}
             >
-              <Text style={[styles.typeButtonText, requestType === "SDV" && styles.typeButtonTextSelected]}>SDV</Text>
+              <Text
+                style={[
+                  styles.typeButtonText,
+                  requestType === "SDV" && styles.typeButtonTextSelected,
+                  timeStats.available.sdv <= 0 && styles.typeButtonTextDisabled,
+                ]}
+              >
+                SDV ({timeStats.available.sdv} left)
+              </Text>
             </TouchableOpacity>
           </View>
 
-          {/* Render the allocation list */}
           <ScrollView style={styles.allocationScrollView} contentContainerStyle={styles.allocationScrollContent}>
             {renderAllocationList()}
           </ScrollView>
@@ -263,8 +336,18 @@ export function RequestModal({ visible, date, division, onClose, onSubmit }: Req
               <Text style={styles.cancelButtonText}>Cancel</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-              <Text style={styles.submitButtonText}>Submit Request</Text>
+            <TouchableOpacity
+              style={[styles.submitButton, !canSubmitRequest && styles.submitButtonDisabled]}
+              onPress={handleSubmit}
+              disabled={!canSubmitRequest || isSubmitting}
+            >
+              {isSubmitting ? (
+                <ActivityIndicator size="small" color="#000000" />
+              ) : (
+                <Text style={[styles.submitButtonText, !canSubmitRequest && styles.submitButtonTextDisabled]}>
+                  {!canSubmitRequest ? `No ${requestType} Days Available` : "Submit Request"}
+                </Text>
+              )}
             </TouchableOpacity>
           </View>
         </View>
@@ -450,5 +533,23 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#000000",
     fontWeight: "500",
+  },
+  typeButtonDisabled: {
+    backgroundColor: "#333333",
+    opacity: 0.5,
+  },
+  typeButtonTextDisabled: {
+    color: "#666666",
+  },
+  submitButtonDisabled: {
+    backgroundColor: "#333333",
+    opacity: 0.5,
+  },
+  submitButtonTextDisabled: {
+    color: "#666666",
+  },
+  pendingBadge: {
+    backgroundColor: "#F59E0B",
+    opacity: 0.7,
   },
 });

@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { View, Text, ActivityIndicator, StyleSheet } from "react-native";
 import { Calendar as RNCalendar, DateData } from "react-native-calendars";
-import { format, addDays, addMonths, isBefore, isAfter, startOfDay, isEqual, isSameMonth, parseISO } from "date-fns";
-
+import { format, addDays, addMonths, isBefore, isAfter, startOfDay, isEqual, isSameMonth } from "date-fns";
 import { useCalendarAllotments } from "@/hooks/useCalendarAllotments";
+import { formatDateToYMD, normalizeDate, parseYMDDate } from "@/utils/date";
 
 interface CalendarProps {
   onSelectDate?: (date: Date) => void;
@@ -12,46 +12,50 @@ interface CalendarProps {
 }
 
 export function Calendar({ onSelectDate, currentViewDate, onChangeViewDate }: CalendarProps) {
-  const [currentMonth, setCurrentMonth] = useState(currentViewDate || new Date());
-  const [selectedDate, setSelectedDate] = useState(format(currentViewDate || new Date(), "yyyy-MM-dd"));
+  const [currentMonth, setCurrentMonth] = useState(normalizeDate(currentViewDate || new Date()));
+  const [selectedDate, setSelectedDate] = useState(formatDateToYMD(currentViewDate || new Date()));
   const [markedDates, setMarkedDates] = useState<any>({});
 
-  const { allotments, isLoading, error } = useCalendarAllotments(currentMonth);
+  const { allotments, isLoading, error, refresh } = useCalendarAllotments(currentMonth);
 
   // Update internal state when currentViewDate prop changes
   useEffect(() => {
     if (currentViewDate) {
-      setCurrentMonth(currentViewDate);
+      const normalized = normalizeDate(currentViewDate);
+      setCurrentMonth(normalized);
       // Only update selected date if it's a new date (to prevent overriding user selections)
-      if (!isSameMonth(currentViewDate, currentMonth)) {
-        setSelectedDate(format(currentViewDate, "yyyy-MM-dd"));
+      if (!isSameMonth(normalized, currentMonth)) {
+        setSelectedDate(formatDateToYMD(normalized));
       }
+      // Refresh allotments when view date changes
+      refresh();
     }
   }, [currentViewDate]);
 
   // Calculate the minimum and maximum allowed request dates
   const dateRanges = useMemo(() => {
-    const today = startOfDay(new Date());
+    const today = normalizeDate(new Date());
     return {
-      minAllowedDate: addDays(today, 2), // Min: current date + 2 days (48 hours)
-      maxAllowedDate: addMonths(today, 6), // Max: current date + 6 months
+      minAllowedDate: normalizeDate(addDays(today, 2)), // Min: current date + 2 days (48 hours)
+      maxAllowedDate: normalizeDate(addMonths(today, 6)), // Max: current date + 6 months
     };
   }, []);
 
   // Check if a date is eligible for requests (within allowed range)
   const isDateEligibleForRequest = (date: Date) => {
-    return !isBefore(date, dateRanges.minAllowedDate) && !isAfter(date, dateRanges.maxAllowedDate);
+    const normalized = normalizeDate(date);
+    return !isBefore(normalized, dateRanges.minAllowedDate) && !isAfter(normalized, dateRanges.maxAllowedDate);
   };
 
   // Update marked dates when allotments change
   useEffect(() => {
     if (!isLoading && !error) {
       const newMarkedDates: any = {};
-      const today = startOfDay(new Date());
+      const today = normalizeDate(new Date());
 
       // Get all dates for the current month display
-      const firstDayOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
-      const lastDayOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
+      const firstDayOfMonth = normalizeDate(new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1));
+      const lastDayOfMonth = normalizeDate(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0));
 
       // Colors for different states (using our brand colors)
       const colors = {
@@ -63,9 +67,9 @@ export function Calendar({ onSelectDate, currentViewDate, onChangeViewDate }: Ca
 
       // Mark all days in the visible month range
       for (let d = new Date(firstDayOfMonth); d <= lastDayOfMonth; d.setDate(d.getDate() + 1)) {
-        const dateStr = format(d, "yyyy-MM-dd");
+        const dateStr = formatDateToYMD(d);
         const allotment = allotments[dateStr];
-        const isEligible = isDateEligibleForRequest(new Date(dateStr));
+        const isEligible = isDateEligibleForRequest(d);
         const isSelected = dateStr === selectedDate;
 
         let backgroundColor = colors.unavailable;
@@ -76,7 +80,7 @@ export function Calendar({ onSelectDate, currentViewDate, onChangeViewDate }: Ca
         if (!isEligible) {
           backgroundColor = colors.unavailable;
           disabledDate = true;
-          textColor = "#CCCCCC"; // Light gray text for unavailable dates - more visible on gray background
+          textColor = "#CCCCCC"; // Light gray text for unavailable dates
         } else if (allotment && allotment.maxAllotment > 0) {
           if (allotment.availability === "available") {
             backgroundColor = colors.available;
@@ -114,12 +118,7 @@ export function Calendar({ onSelectDate, currentViewDate, onChangeViewDate }: Ca
 
   const handleDateSelect = (day: DateData) => {
     const dateStr = day.dateString;
-
-    // Use parseISO to ensure proper date parsing with timezone handling
-    const selectedDateObj = parseISO(dateStr);
-
-    // Set time to noon to avoid timezone issues
-    selectedDateObj.setHours(12, 0, 0, 0);
+    const selectedDateObj = normalizeDate(dateStr);
 
     // Only allow selection of eligible dates
     if (isDateEligibleForRequest(selectedDateObj)) {
@@ -134,9 +133,7 @@ export function Calendar({ onSelectDate, currentViewDate, onChangeViewDate }: Ca
 
   const handleMonthChange = (monthData: DateData) => {
     // Create a new Date object for the first day of the selected month
-    const newDate = new Date(monthData.year, monthData.month - 1, 1);
-    // Set time to noon to avoid timezone issues
-    newDate.setHours(12, 0, 0, 0);
+    const newDate = normalizeDate(new Date(monthData.year, monthData.month - 1, 1));
 
     setCurrentMonth(newDate);
 
@@ -146,42 +143,13 @@ export function Calendar({ onSelectDate, currentViewDate, onChangeViewDate }: Ca
     }
   };
 
-  const renderLegend = () => (
-    <View style={styles.legendContainer}>
-      <View style={styles.legendRow}>
-        <View style={[styles.legendDot, { backgroundColor: "#BAC42A" }]} />
-        <Text style={styles.legendText}>Available</Text>
-      </View>
-
-      <View style={styles.legendRow}>
-        <View style={[styles.legendDot, { backgroundColor: "#F59E0B" }]} />
-        <Text style={styles.legendText}>Limited</Text>
-      </View>
-
-      <View style={styles.legendRow}>
-        <View style={[styles.legendDot, { backgroundColor: "#EF4444" }]} />
-        <Text style={styles.legendText}>Full</Text>
-      </View>
-
-      <View style={styles.legendRow}>
-        <View style={[styles.legendDot, { backgroundColor: "#6B7280" }]} />
-        <Text style={styles.legendText}>Unavailable</Text>
-      </View>
-    </View>
-  );
-
   const renderSelectedDate = () => {
     if (!selectedDate || !allotments[selectedDate]) {
       return null;
     }
 
     const allotment = allotments[selectedDate];
-
-    // Use parseISO to ensure proper date parsing with timezone handling
-    const selectedDateObj = parseISO(selectedDate);
-    // Set time to noon to avoid timezone issues
-    selectedDateObj.setHours(12, 0, 0, 0);
-
+    const selectedDateObj = parseYMDDate(selectedDate);
     const isEligible = isDateEligibleForRequest(selectedDateObj);
     const isTooEarly = isBefore(selectedDateObj, dateRanges.minAllowedDate);
     const isTooLate = isAfter(selectedDateObj, dateRanges.maxAllowedDate);
@@ -227,41 +195,33 @@ export function Calendar({ onSelectDate, currentViewDate, onChangeViewDate }: Ca
   }
 
   // Get the min and max date strings for the calendar
-  const minDateStr = format(new Date(), "yyyy-MM-dd");
-  const maxDateStr = format(dateRanges.maxAllowedDate, "yyyy-MM-dd");
+  const minDateStr = formatDateToYMD(new Date());
+  const maxDateStr = formatDateToYMD(dateRanges.maxAllowedDate);
 
   return (
     <View style={styles.container}>
       <RNCalendar
         current={format(currentMonth, "yyyy-MM-dd")}
+        minDate={minDateStr}
+        maxDate={maxDateStr}
         onDayPress={handleDateSelect}
         onMonthChange={handleMonthChange}
-        markedDates={markedDates}
         markingType="custom"
-        maxDate={maxDateStr}
-        enableSwipeMonths={true}
+        markedDates={markedDates}
         theme={{
           backgroundColor: "#000000",
           calendarBackground: "#000000",
-          textSectionTitleColor: "#9CA3AF",
+          textSectionTitleColor: "#FFFFFF",
           selectedDayBackgroundColor: "#BAC42A",
           selectedDayTextColor: "#000000",
           todayTextColor: "#BAC42A",
           dayTextColor: "#FFFFFF",
-          textDisabledColor: "#9CA3AF", // Updated to be more visible
-          arrowColor: "#BAC42A",
+          textDisabledColor: "#666666",
           monthTextColor: "#FFFFFF",
-          indicatorColor: "#BAC42A",
-          textDayFontWeight: "400",
-          textMonthFontWeight: "600",
-          textDayHeaderFontWeight: "500",
-          textDayFontSize: 14,
-          textMonthFontSize: 16,
-          textDayHeaderFontSize: 13,
+          arrowColor: "#BAC42A",
         }}
       />
 
-      {renderLegend()}
       {renderSelectedDate()}
     </View>
   );
@@ -288,29 +248,6 @@ const styles = StyleSheet.create({
   errorText: {
     color: "#EF4444",
     textAlign: "center",
-  },
-  legendContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginTop: 16,
-    padding: 12,
-    backgroundColor: "#111111",
-    borderRadius: 8,
-  },
-  legendRow: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  legendDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginRight: 6,
-  },
-  legendText: {
-    fontSize: 12,
-    color: "#FFFFFF",
   },
   selectedDateContainer: {
     marginTop: 24,

@@ -1,9 +1,10 @@
 import React, { useState } from "react";
 import { StyleSheet, View, Text, TouchableOpacity, FlatList, Alert } from "react-native";
-import { format } from "date-fns";
 import { Feather } from "@expo/vector-icons";
 import { TimeOffRequest } from "@/hooks/useMyTime";
 import { ConfirmationModal } from "./ConfirmationModal";
+import { formatDateToYMD, normalizeDate, parseYMDDate } from "@/utils/date";
+import { format } from "date-fns";
 
 interface TimeOffRequestsListProps {
   requests: TimeOffRequest[];
@@ -33,9 +34,10 @@ export function TimeOffRequestsList({
     }
   });
 
-  // Format date function
+  // Format date function using our utility
   const formatDate = (dateString: string) => {
-    return format(new Date(dateString), "MMM d, yyyy");
+    const normalizedDate = parseYMDDate(dateString);
+    return format(normalizedDate, "MMM d, yyyy");
   };
 
   // Open cancel confirmation modal

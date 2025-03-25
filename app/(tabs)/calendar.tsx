@@ -7,6 +7,8 @@ import { RequestModal } from "@/components/calendar/RequestModal";
 import { AppHeader } from "@/components/AppHeader";
 import { getCurrentMember } from "@/lib/supabase";
 import { TextInput } from "react-native";
+import { useMyTime } from "@/hooks/useMyTime";
+import { useCalendarAllotments } from "@/hooks/useCalendarAllotments";
 
 export default function CalendarScreen() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -19,6 +21,8 @@ export default function CalendarScreen() {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [userDivision, setUserDivision] = useState<string>("174"); // Default to division 174 but will be updated
   const [dateInputValue, setDateInputValue] = useState<string>("");
+  const { refresh: refreshTimeData } = useMyTime();
+  const { refresh: refreshAllotments } = useCalendarAllotments(currentViewDate);
 
   // Fetch the user's division when component mounts
   useEffect(() => {
@@ -73,10 +77,14 @@ export default function CalendarScreen() {
     setIsModalVisible(false);
   };
 
-  const handleSubmitRequest = (type: "PLD" | "SDV") => {
-    // This will be implemented in the next phase
-    console.log(`Submitting ${type} request for ${format(selectedDate!, "yyyy-MM-dd")}`);
+  const handleSubmitRequest = async (type: "PLD" | "SDV") => {
     setIsModalVisible(false);
+    // Refresh time data to update available days
+    await refreshTimeData();
+    // Refresh allotments to update the calendar
+    await refreshAllotments();
+    // Force a re-render of the calendar by updating the currentViewDate
+    setCurrentViewDate(new Date(currentViewDate));
   };
 
   const handleJumpToDate = () => {
