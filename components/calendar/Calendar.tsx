@@ -36,63 +36,68 @@ export function Calendar({ onSelectDate }: CalendarProps) {
       const newMarkedDates: any = {};
       const today = startOfDay(new Date());
 
-      // Mark dates based on availability
-      Object.entries(allotments).forEach(([dateStr, allotment]) => {
-        const currentDate = new Date(dateStr);
-        let dotColor = "#6B7280"; // gray (no allotment)
+      // Get all dates for the current month display
+      const firstDayOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
+      const lastDayOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
+
+      // Colors for different states (using our brand colors)
+      const colors = {
+        available: "#BAC42A", // green
+        limited: "#F59E0B", // amber/orange
+        full: "#EF4444", // red
+        unavailable: "#6B7280", // gray
+      };
+
+      // Mark all days in the visible month range
+      for (let d = new Date(firstDayOfMonth); d <= lastDayOfMonth; d.setDate(d.getDate() + 1)) {
+        const dateStr = format(d, "yyyy-MM-dd");
+        const allotment = allotments[dateStr];
+        const isEligible = isDateEligibleForRequest(new Date(dateStr));
+        const isSelected = dateStr === selectedDate;
+
+        let backgroundColor = colors.unavailable;
+        let textColor = "#FFFFFF"; // Default text color is white
         let disabledDate = false;
-        let textColor = undefined;
 
         // Check if date is outside allowed range (too early or too late)
-        if (isBefore(currentDate, dateRanges.minAllowedDate)) {
-          // Past dates or within 48 hours
-          dotColor = "#6B7280"; // gray
+        if (!isEligible) {
+          backgroundColor = colors.unavailable;
           disabledDate = true;
-          textColor = "#666666"; // dimmed text for unavailable dates
-        } else if (isAfter(currentDate, dateRanges.maxAllowedDate)) {
-          // More than 6 months in the future
-          dotColor = "#6B7280"; // gray
-          disabledDate = true;
-          textColor = "#666666"; // dimmed text for unavailable dates
-        } else if (allotment.maxAllotment > 0) {
+          textColor = "#CCCCCC"; // Light gray text for unavailable dates - more visible on gray background
+        } else if (allotment && allotment.maxAllotment > 0) {
           if (allotment.availability === "available") {
-            dotColor = "#BAC42A"; // green (using brand color)
+            backgroundColor = colors.available;
+            textColor = "#000000"; // Black text on green background for better contrast
           } else if (allotment.availability === "limited") {
-            dotColor = "#F59E0B"; // amber
+            backgroundColor = colors.limited;
+            textColor = "#000000"; // Black text on orange background for better contrast
           } else if (allotment.availability === "full") {
-            dotColor = "#EF4444"; // red
+            backgroundColor = colors.full;
           }
         }
 
         newMarkedDates[dateStr] = {
-          marked: true,
-          dotColor: dotColor,
-          selected: dateStr === selectedDate && !disabledDate,
-          selectedColor: "#BAC42A", // brand green
-          allotment: allotment,
+          selected: isSelected && !disabledDate,
+          selectedColor: "#BAC42A", // brand green for selection
+          customStyles: {
+            container: {
+              backgroundColor: isSelected && !disabledDate ? "#BAC42A" : backgroundColor,
+              borderRadius: 16,
+            },
+            text: {
+              color: isSelected && !disabledDate ? "#000000" : textColor,
+              fontWeight: isSelected ? "bold" : "normal",
+            },
+          },
           disabled: disabledDate,
           disableTouchEvent: disabledDate,
-          textColor: textColor,
-        };
-      });
-
-      // Ensure selected date is always marked (if eligible)
-      if (selectedDate && !newMarkedDates[selectedDate]) {
-        const selectedDateObj = new Date(selectedDate);
-        const isEligible = isDateEligibleForRequest(selectedDateObj);
-
-        newMarkedDates[selectedDate] = {
-          selected: isEligible,
-          selectedColor: "#BAC42A", // brand green
-          disabled: !isEligible,
-          disableTouchEvent: !isEligible,
-          textColor: !isEligible ? "#666666" : undefined,
+          allotment: allotment,
         };
       }
 
       setMarkedDates(newMarkedDates);
     }
-  }, [allotments, isLoading, error, selectedDate, dateRanges]);
+  }, [allotments, isLoading, error, selectedDate, dateRanges, currentMonth]);
 
   const handleDateSelect = (day: DateData) => {
     const dateStr = day.dateString;
@@ -201,7 +206,7 @@ export function Calendar({ onSelectDate }: CalendarProps) {
         onDayPress={handleDateSelect}
         onMonthChange={handleMonthChange}
         markedDates={markedDates}
-        markingType="dot"
+        markingType="custom"
         maxDate={maxDateStr}
         enableSwipeMonths={true}
         theme={{
@@ -212,9 +217,7 @@ export function Calendar({ onSelectDate }: CalendarProps) {
           selectedDayTextColor: "#000000",
           todayTextColor: "#BAC42A",
           dayTextColor: "#FFFFFF",
-          textDisabledColor: "#4B5563",
-          dotColor: "#BAC42A",
-          selectedDotColor: "#000000",
+          textDisabledColor: "#9CA3AF", // Updated to be more visible
           arrowColor: "#BAC42A",
           monthTextColor: "#FFFFFF",
           indicatorColor: "#BAC42A",

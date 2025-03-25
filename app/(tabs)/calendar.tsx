@@ -1,14 +1,32 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, Image, Platform, ScrollView } from "react-native";
 import { format, addDays, addMonths, isBefore, isAfter, startOfDay } from "date-fns";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Calendar } from "@/components/calendar/Calendar";
 import { RequestModal } from "@/components/calendar/RequestModal";
 import { AppHeader } from "@/components/AppHeader";
+import { getCurrentMember } from "@/lib/supabase";
 
 export default function CalendarScreen() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const [userDivision, setUserDivision] = useState<string>("174"); // Default to division 174 but will be updated
+
+  // Fetch the user's division when component mounts
+  useEffect(() => {
+    async function loadUserData() {
+      try {
+        const member = await getCurrentMember();
+        if (member?.division) {
+          setUserDivision(member.division);
+        }
+      } catch (error) {
+        console.error("Error fetching user division:", error);
+      }
+    }
+
+    loadUserData();
+  }, []);
 
   // Calculate the allowed date range
   const dateRanges = useMemo(() => {
@@ -86,6 +104,7 @@ export default function CalendarScreen() {
           <RequestModal
             visible={isModalVisible}
             date={selectedDate}
+            division={userDivision}
             onClose={handleCloseModal}
             onSubmit={handleSubmitRequest}
           />
