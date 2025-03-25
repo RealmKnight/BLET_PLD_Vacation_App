@@ -10,12 +10,24 @@ import { AuthHeader } from "@/components/AuthHeader";
 import { TimeStats } from "@/components/my-time/TimeStats";
 import { TimeOffRequestsList } from "@/components/my-time/TimeOffRequestsList";
 import { useMyTime } from "@/hooks/useMyTime";
+import { useCalendarAllotments } from "@/hooks/useCalendarAllotments";
 
 export default function MyTimeScreen() {
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
 
   const { timeStats, timeOffRequests, isLoading, error, cancelRequest, requestPaidInLieu, refresh } = useMyTime();
+  const { refresh: refreshAllotments } = useCalendarAllotments(new Date());
+
+  // Handle successful cancellation
+  const handleCancelRequest = async (requestId: string) => {
+    const success = await cancelRequest(requestId);
+    if (success) {
+      // Refresh both time data and calendar allotments
+      await Promise.all([refresh(), refreshAllotments()]);
+    }
+    return success;
+  };
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
@@ -50,7 +62,7 @@ export default function MyTimeScreen() {
             {/* Time Off Requests */}
             <TimeOffRequestsList
               requests={timeOffRequests}
-              onCancel={cancelRequest}
+              onCancel={handleCancelRequest}
               onRequestPaidInLieu={requestPaidInLieu}
               isLoading={isLoading}
               showWaitlisted={false}
@@ -59,7 +71,7 @@ export default function MyTimeScreen() {
             {/* Waitlisted Requests */}
             <TimeOffRequestsList
               requests={timeOffRequests}
-              onCancel={cancelRequest}
+              onCancel={handleCancelRequest}
               onRequestPaidInLieu={requestPaidInLieu}
               isLoading={isLoading}
               showWaitlisted={true}

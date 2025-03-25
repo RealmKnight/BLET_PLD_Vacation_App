@@ -4,6 +4,8 @@ import { format, addDays, addMonths, isBefore, isAfter, startOfDay, parseISO } f
 import { supabase } from "@/lib/supabase";
 import { useTimeOffRequests } from "@/hooks/useTimeOffRequests";
 import { useMyTime } from "@/hooks/useMyTime";
+import { getCurrentMember } from "@/lib/supabase";
+import { useCalendarAllotments } from "@/hooks/useCalendarAllotments";
 
 // Define types for allocation data
 type MemberRequest = {
@@ -11,7 +13,7 @@ type MemberRequest = {
   first_name: string | null;
   last_name: string | null;
   leave_type: "PLD" | "SDV";
-  status: "pending" | "approved" | "denied" | "waitlisted";
+  status: "pending" | "approved" | "denied" | "waitlisted" | "cancellation_pending" | "cancelled";
 };
 
 type AllocationSlot = {
@@ -33,9 +35,11 @@ export function RequestModal({ visible, date, division, onClose, onSubmit }: Req
   const [loading, setLoading] = useState(false);
   const [maxAllotment, setMaxAllotment] = useState(6); // Default to 6 until we fetch the real value
   const [error, setError] = useState<string | null>(null);
+  const [existingRequest, setExistingRequest] = useState<{ type: "PLD" | "SDV"; status: string } | null>(null);
 
   const { timeStats } = useMyTime();
   const { submitRequest, isSubmitting } = useTimeOffRequests();
+  const { refresh: refreshAllotments } = useCalendarAllotments(date || new Date());
 
   // Calculate the allowed date range
   const dateRanges = useMemo(() => {
@@ -65,8 +69,9 @@ export function RequestModal({ visible, date, division, onClose, onSubmit }: Req
     return { isEligible, isTooEarly, isTooLate };
   }, [date, dateRanges]);
 
+  // Check if user can submit request
   const canSubmitRequest = useMemo(() => {
-    if (!date || !dateStatus.isEligible) return false;
+    if (!date || !dateStatus.isEligible || existingRequest) return false;
 
     // Check if there are available slots
     const currentAllocations = allocations.filter((a) => a.member).length;
@@ -80,7 +85,7 @@ export function RequestModal({ visible, date, division, onClose, onSubmit }: Req
     } else {
       return timeStats.available.sdv > 0;
     }
-  }, [date, dateStatus.isEligible, allocations, maxAllotment, requestType, timeStats]);
+  }, [date, dateStatus.isEligible, allocations, maxAllotment, requestType, timeStats, existingRequest]);
 
   // Load allocation and requests data for the selected date
   const fetchAllocations = async () => {
@@ -88,12 +93,36 @@ export function RequestModal({ visible, date, division, onClose, onSubmit }: Req
 
     setLoading(true);
     setError(null);
+    setExistingRequest(null);
 
     try {
       // Ensure date is normalized for consistent formatting
       const normalizedDate = new Date(date);
       normalizedDate.setHours(12, 0, 0, 0);
       const formattedDate = format(normalizedDate, "yyyy-MM-dd");
+
+      // Get current member
+      const member = await getCurrentMember();
+      if (!member?.id) {
+        throw new Error("Unable to load member data");
+      }
+
+      // Check for existing requests for this date
+      const { data: existingRequests, error: checkError } = await supabase
+        .from("pld_sdv_requests")
+        .select("leave_type, status")
+        .eq("member_id", member.id)
+        .eq("request_date", formattedDate)
+        .in("status", ["pending", "approved", "waitlisted", "cancellation_pending"]);
+
+      if (checkError) throw checkError;
+
+      if (existingRequests && existingRequests.length > 0) {
+        setExistingRequest({
+          type: existingRequests[0].leave_type,
+          status: existingRequests[0].status,
+        });
+      }
 
       // 1. Get max allotment for the date
       const { data: allotmentData, error: allotmentError } = await supabase
@@ -188,29 +217,33 @@ export function RequestModal({ visible, date, division, onClose, onSubmit }: Req
   }, [date, division, visible]);
 
   const handleSubmit = async () => {
-    if (!date || !dateStatus.isEligible || !canSubmitRequest) {
-      if (!canSubmitRequest) {
-        if (requestType === "PLD" && timeStats.available.pld <= 0) {
-          Alert.alert("No PLD Days Available", "You have used all your available PLD days.");
-        } else if (requestType === "SDV" && timeStats.available.sdv <= 0) {
-          Alert.alert("No SDV Days Available", "You have used all your available SDV days.");
-        } else {
-          Alert.alert("No Slots Available", "All slots for this date have been filled.");
+    if (!canSubmitRequest || !date) return;
+
+    try {
+      setError(null);
+      const success = await submitRequest(date, requestType, division);
+
+      if (success) {
+        // Refresh allotments after successful submission
+        await refreshAllotments();
+        handleClose();
+        if (onSubmit) {
+          onSubmit(requestType);
         }
       }
-      return;
+    } catch (error) {
+      if (error instanceof Error) {
+        setError(error.message);
+      } else {
+        setError("An unexpected error occurred");
+      }
     }
+  };
 
-    const result = await submitRequest(date, requestType, division);
-    if (result) {
-      // Wait a short moment to ensure the database has processed the request
-      setTimeout(async () => {
-        await fetchAllocations();
-      }, 500);
-
-      // Notify parent
-      onSubmit(requestType);
-    }
+  const handleClose = async () => {
+    // Refresh allotments before closing to ensure calendar is up to date
+    await refreshAllotments();
+    onClose();
   };
 
   // If date isn't eligible, close the modal
@@ -277,8 +310,25 @@ export function RequestModal({ visible, date, division, onClose, onSubmit }: Req
     );
   };
 
+  // Get the submit button text
+  const getSubmitButtonText = () => {
+    if (!canSubmitRequest) {
+      if (existingRequest) {
+        return `${existingRequest.type} Request Already ${existingRequest.status}`;
+      }
+      if (requestType === "PLD" && timeStats.available.pld <= 0) {
+        return "No PLD Days Available";
+      }
+      if (requestType === "SDV" && timeStats.available.sdv <= 0) {
+        return "No SDV Days Available";
+      }
+      return "No Slots Available";
+    }
+    return "Submit Request";
+  };
+
   return (
-    <Modal visible={visible && dateStatus.isEligible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible && dateStatus.isEligible} transparent animationType="slide" onRequestClose={handleClose}>
       <View style={styles.overlay}>
         <View style={styles.container}>
           <Text style={styles.title}>Request Leave for {format(date, "EEEE, MMMM d, yyyy")}</Text>
@@ -332,20 +382,29 @@ export function RequestModal({ visible, date, division, onClose, onSubmit }: Req
           </ScrollView>
 
           <View style={styles.buttonContainer}>
-            <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
-              <Text style={styles.cancelButtonText}>Cancel</Text>
+            <TouchableOpacity style={styles.cancelButton} onPress={handleClose} disabled={isSubmitting}>
+              <Text style={[styles.cancelButtonText, isSubmitting && styles.disabledButtonText]}>Cancel</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.submitButton, !canSubmitRequest && styles.submitButtonDisabled]}
+              style={[
+                styles.submitButton,
+                !canSubmitRequest && styles.submitButtonDisabled,
+                isSubmitting && styles.submitButtonDisabled,
+              ]}
               onPress={handleSubmit}
               disabled={!canSubmitRequest || isSubmitting}
             >
               {isSubmitting ? (
                 <ActivityIndicator size="small" color="#000000" />
               ) : (
-                <Text style={[styles.submitButtonText, !canSubmitRequest && styles.submitButtonTextDisabled]}>
-                  {!canSubmitRequest ? `No ${requestType} Days Available` : "Submit Request"}
+                <Text
+                  style={[
+                    styles.submitButtonText,
+                    (!canSubmitRequest || isSubmitting) && styles.submitButtonTextDisabled,
+                  ]}
+                >
+                  {getSubmitButtonText()}
                 </Text>
               )}
             </TouchableOpacity>
@@ -551,5 +610,8 @@ const styles = StyleSheet.create({
   pendingBadge: {
     backgroundColor: "#F59E0B",
     opacity: 0.7,
+  },
+  disabledButtonText: {
+    opacity: 0.5,
   },
 });

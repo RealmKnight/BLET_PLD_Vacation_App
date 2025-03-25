@@ -7,8 +7,9 @@ interface ConfirmationModalProps {
   message: string;
   confirmText: string;
   cancelText: string;
-  onConfirm: () => void;
+  onConfirm: () => Promise<boolean> | Promise<void>;
   onCancel: () => void;
+  onSuccess?: () => Promise<void> | void;
   isLoading?: boolean;
   destructive?: boolean;
 }
@@ -21,9 +22,24 @@ export function ConfirmationModal({
   cancelText,
   onConfirm,
   onCancel,
+  onSuccess,
   isLoading = false,
   destructive = false,
 }: ConfirmationModalProps) {
+  const handleConfirm = async () => {
+    try {
+      const result = await onConfirm();
+      if (result !== false) {
+        // If result is void or true, consider it successful
+        if (onSuccess) {
+          await onSuccess();
+        }
+      }
+    } catch (error) {
+      console.error("Error in confirmation:", error);
+    }
+  };
+
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
       <View style={styles.overlay}>
@@ -38,7 +54,7 @@ export function ConfirmationModal({
 
             <TouchableOpacity
               style={[styles.confirmButton, destructive && styles.destructiveButton, isLoading && styles.loadingButton]}
-              onPress={onConfirm}
+              onPress={handleConfirm}
               disabled={isLoading}
             >
               {isLoading ? (

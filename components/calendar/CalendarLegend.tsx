@@ -1,28 +1,56 @@
 import React from "react";
-import { View, Text } from "react-native";
+import { View, Text, StyleSheet } from "react-native";
 
 export function CalendarLegend() {
   return (
-    <View className="flex-row justify-between items-center mt-4 px-4 py-2 bg-gray-50 rounded-lg">
-      <View className="flex-row items-center">
-        <View className="w-4 h-4 rounded-full bg-green-100 mr-2" />
-        <Text className="text-xs text-gray-700">Available</Text>
+    <View style={styles.container}>
+      <View style={styles.legendItem}>
+        <View style={[styles.colorDot, { backgroundColor: "#BAC42A" }]} />
+        <Text style={styles.legendText}>Available</Text>
       </View>
 
-      <View className="flex-row items-center">
-        <View className="w-4 h-4 rounded-full bg-yellow-100 mr-2" />
-        <Text className="text-xs text-gray-700">Limited</Text>
+      <View style={styles.legendItem}>
+        <View style={[styles.colorDot, { backgroundColor: "#F59E0B" }]} />
+        <Text style={styles.legendText}>Limited</Text>
       </View>
 
-      <View className="flex-row items-center">
-        <View className="w-4 h-4 rounded-full bg-red-100 mr-2" />
-        <Text className="text-xs text-gray-700">Full</Text>
+      <View style={styles.legendItem}>
+        <View style={[styles.colorDot, { backgroundColor: "#EF4444" }]} />
+        <Text style={styles.legendText}>Full</Text>
       </View>
 
-      <View className="flex-row items-center">
-        <View className="w-4 h-4 rounded-full bg-gray-100 mr-2" />
-        <Text className="text-xs text-gray-700">No Allotment</Text>
+      <View style={styles.legendItem}>
+        <View style={[styles.colorDot, { backgroundColor: "#6B7280" }]} />
+        <Text style={styles.legendText}>Restricted</Text>
       </View>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 16,
+    padding: 12,
+    backgroundColor: "#111111",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#333333",
+  },
+  legendItem: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  colorDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: 6,
+  },
+  legendText: {
+    fontSize: 12,
+    color: "#FFFFFF",
+  },
+});

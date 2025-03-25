@@ -62,6 +62,7 @@ export function Calendar({ onSelectDate, currentViewDate, onChangeViewDate }: Ca
         available: "#BAC42A", // green
         limited: "#F59E0B", // amber/orange
         full: "#EF4444", // red
+        restricted: "#6B7280", // gray
         unavailable: "#6B7280", // gray
       };
 
@@ -78,7 +79,7 @@ export function Calendar({ onSelectDate, currentViewDate, onChangeViewDate }: Ca
 
         // Check if date is outside allowed range (too early or too late)
         if (!isEligible) {
-          backgroundColor = colors.unavailable;
+          backgroundColor = colors.restricted;
           disabledDate = true;
           textColor = "#CCCCCC"; // Light gray text for unavailable dates
         } else if (allotment && allotment.maxAllotment > 0) {
@@ -90,6 +91,10 @@ export function Calendar({ onSelectDate, currentViewDate, onChangeViewDate }: Ca
             textColor = "#000000"; // Black text on orange background for better contrast
           } else if (allotment.availability === "full") {
             backgroundColor = colors.full;
+          } else if (allotment.availability === "restricted") {
+            backgroundColor = colors.restricted;
+            disabledDate = true;
+            textColor = "#CCCCCC"; // Light gray text for restricted dates
           }
         }
 

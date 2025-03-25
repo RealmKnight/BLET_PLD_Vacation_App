@@ -5,6 +5,7 @@ import { TimeOffRequest } from "@/hooks/useMyTime";
 import { ConfirmationModal } from "./ConfirmationModal";
 import { formatDateToYMD, normalizeDate, parseYMDDate } from "@/utils/date";
 import { format } from "date-fns";
+import { useCalendarAllotments } from "@/hooks/useCalendarAllotments";
 
 interface TimeOffRequestsListProps {
   requests: TimeOffRequest[];
@@ -24,6 +25,9 @@ export function TimeOffRequestsList({
   const [actionInProgress, setActionInProgress] = useState<string | null>(null);
   const [selectedRequest, setSelectedRequest] = useState<TimeOffRequest | null>(null);
   const [modalType, setModalType] = useState<"cancel" | "paidInLieu" | null>(null);
+
+  // Get the calendar allotments functions
+  const { refreshDate } = useCalendarAllotments(new Date());
 
   // Filter requests based on status (waitlisted or not)
   const filteredRequests = requests.filter((request) => {
@@ -66,7 +70,11 @@ export function TimeOffRequestsList({
     const success = await onCancel(selectedRequest.id);
     setActionInProgress(null);
 
-    if (!success) {
+    if (success) {
+      // Refresh the allotments for the specific date that was cancelled
+      const requestDate = parseYMDDate(selectedRequest.requestDate);
+      await refreshDate(requestDate);
+    } else {
       Alert.alert("Error", "Failed to cancel request. Please try again.");
     }
 

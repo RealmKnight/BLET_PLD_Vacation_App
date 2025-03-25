@@ -10,6 +10,8 @@ export function useTimeOffRequests() {
   const [error, setError] = useState<string | null>(null);
 
   const submitRequest = async (date: Date, type: "PLD" | "SDV", division: string) => {
+    if (isSubmitting) return null; // Prevent double submission
+
     setIsSubmitting(true);
     setError(null);
 
@@ -21,6 +23,25 @@ export function useTimeOffRequests() {
 
       // Format date using our utility function
       const formattedDate = formatDateToYMD(normalizeDate(date));
+
+      // Check for any existing active requests for this date
+      const { data: existingRequests, error: checkError } = await supabase
+        .from("pld_sdv_requests")
+        .select("leave_type, status")
+        .eq("member_id", member.id)
+        .eq("request_date", formattedDate)
+        .in("status", ["pending", "approved", "waitlisted", "cancellation_pending"]);
+
+      if (checkError) {
+        throw checkError;
+      }
+
+      if (existingRequests && existingRequests.length > 0) {
+        const message = `You already have an active ${existingRequests[0].leave_type} request for this date (${existingRequests[0].status}). Please cancel it first if you want to make a new request.`;
+        setError(message);
+        Alert.alert("Active Request Exists", message);
+        return null;
+      }
 
       // Submit the request
       const { data: request, error: requestError } = await supabase
@@ -37,12 +58,10 @@ export function useTimeOffRequests() {
         .single();
 
       if (requestError) {
-        if (requestError.code === "23505") {
-          // Unique constraint violation
-          Alert.alert("Request Already Exists", "You already have a request for this date.");
-        } else {
-          throw requestError;
-        }
+        // Handle database errors
+        const errorMessage = requestError.message || "An unexpected error occurred";
+        setError(errorMessage);
+        Alert.alert("Request Failed", errorMessage);
         return null;
       }
 
@@ -54,8 +73,13 @@ export function useTimeOffRequests() {
       return request;
     } catch (err: any) {
       console.error("Error submitting request:", err);
-      setError(err.message || "Failed to submit request");
-      Alert.alert("Error", "Failed to submit request. Please try again later.");
+      const errorMessage = err.message || "Failed to submit request";
+      setError(errorMessage);
+
+      // Only show alert if one hasn't been shown already
+      if (!err.message?.includes("active request already exists")) {
+        Alert.alert("Error", "Failed to submit request. Please try again later.");
+      }
       return null;
     } finally {
       setIsSubmitting(false);
