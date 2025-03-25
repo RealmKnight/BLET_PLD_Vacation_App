@@ -37,7 +37,7 @@ export interface TimeOffRequest {
   requestDate: string;
   requestedAt: string;
   leaveType: "PLD" | "SDV";
-  status: "pending" | "approved" | "denied" | "waitlisted";
+  status: "pending" | "approved" | "denied" | "waitlisted" | "cancellation_pending" | "cancelled";
   waitlistPosition?: number;
   paidInLieu?: boolean;
   respondedAt?: string;
@@ -119,7 +119,7 @@ export function useMyTime() {
       const formattedRequests: TimeOffRequest[] =
         requests?.map((request) => {
           // Count by status and type
-          if (request.status === "pending") {
+          if (request.status === "pending" || request.status === "cancellation_pending") {
             if (request.leave_type === "PLD") requestedPld++;
             else requestedSdv++;
           } else if (request.status === "waitlisted") {
@@ -173,7 +173,13 @@ export function useMyTime() {
   // Cancel a request
   const cancelRequest = async (requestId: string) => {
     try {
-      const { error } = await supabase.from("pld_sdv_requests").delete().eq("id", requestId);
+      const { error } = await supabase
+        .from("pld_sdv_requests")
+        .update({
+          status: "cancellation_pending",
+          responded_at: null,
+        })
+        .eq("id", requestId);
 
       if (error) throw error;
 

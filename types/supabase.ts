@@ -216,7 +216,7 @@ export type Database = {
     Enums: {
       division: "163" | "173" | "174" | "175" | "184" | "185" | "188" | "209" | "520";
       leave_type: "PLD" | "SDV";
-      pld_sdv_status: "pending" | "approved" | "denied" | "waitlisted";
+      pld_sdv_status: "pending" | "approved" | "denied" | "waitlisted" | "cancellation_pending" | "cancelled";
       role: "user" | "division_admin" | "union_admin" | "application_admi" | "company_admin";
       sys_seniority_type: "WC" | "DMIR" | "DWP" | "SYS1" | "EJ&E" | "SYS2";
       zone:

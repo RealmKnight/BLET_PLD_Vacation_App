@@ -30,7 +30,7 @@ export function TimeOffRequestsList({
     if (showWaitlisted) {
       return request.status === "waitlisted";
     } else {
-      return request.status !== "waitlisted";
+      return request.status !== "waitlisted" && request.status !== "cancelled";
     }
   });
 
@@ -107,7 +107,7 @@ export function TimeOffRequestsList({
   }
 
   const renderItem = ({ item }: { item: TimeOffRequest }) => (
-    <View style={styles.requestItem}>
+    <View style={[styles.requestItem, item.status === "cancellation_pending" && styles.cancellationPending]}>
       <View style={styles.requestInfo}>
         <View style={styles.dateContainer}>
           <Text style={styles.dateText}>{formatDate(item.requestDate)}</Text>
@@ -128,9 +128,12 @@ export function TimeOffRequestsList({
                 item.status === "approved" && styles.approvedText,
                 item.status === "pending" && styles.pendingText,
                 item.status === "denied" && styles.deniedText,
+                item.status === "cancellation_pending" && styles.cancellationPendingText,
               ]}
             >
-              {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
+              {item.status === "cancellation_pending"
+                ? "Cancellation Pending"
+                : item.status.charAt(0).toUpperCase() + item.status.slice(1)}
               {item.paidInLieu && " • Paid in Lieu"}
             </Text>
           )}
@@ -145,7 +148,7 @@ export function TimeOffRequestsList({
           <TouchableOpacity
             style={styles.actionButton}
             onPress={() => openCancelConfirmation(item)}
-            disabled={actionInProgress === item.id}
+            disabled={actionInProgress === item.id || item.status === "cancellation_pending"}
           >
             <Feather name="x-circle" size={22} color="#EF4444" />
           </TouchableOpacity>
@@ -325,5 +328,13 @@ const styles = StyleSheet.create({
   emptyText: {
     color: "#9CA3AF",
     fontSize: 16,
+  },
+  cancellationPending: {
+    borderColor: "#EF4444",
+    borderWidth: 2,
+  },
+  cancellationPendingText: {
+    color: "#EF4444",
+    fontStyle: "italic",
   },
 });

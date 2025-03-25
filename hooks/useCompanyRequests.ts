@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { format } from "date-fns";
+import { formatDateToYMD, normalizeDate } from "@/utils/date";
+import { useAuth } from "@/contexts/AuthContext";
 
 export interface CompanyRequest {
   id: string;
@@ -9,7 +11,7 @@ export interface CompanyRequest {
   last_name: string;
   request_date: string;
   leave_type: "PLD" | "SDV";
-  status: "pending" | "approved" | "denied" | "waitlisted";
+  status: "pending" | "approved" | "denied" | "waitlisted" | "cancellation_pending" | "cancelled";
   division: string;
 }
 
@@ -17,6 +19,7 @@ export function useCompanyRequests() {
   const [requests, setRequests] = useState<CompanyRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { user } = useAuth();
 
   // Load pending requests
   const loadRequests = async () => {
@@ -24,7 +27,7 @@ export function useCompanyRequests() {
     setError(null);
 
     try {
-      // Get all pending requests, ordered by date (closest first)
+      // Get all pending and cancellation pending requests, ordered by date (closest first)
       const { data: requestsData, error: requestsError } = await supabase
         .from("pld_sdv_requests")
         .select(
@@ -37,7 +40,7 @@ export function useCompanyRequests() {
           member_id
         `
         )
-        .eq("status", "pending")
+        .in("status", ["pending", "cancellation_pending"])
         .order("request_date", { ascending: true });
 
       if (requestsError) throw requestsError;
@@ -86,7 +89,7 @@ export function useCompanyRequests() {
         .from("pld_sdv_requests")
         .update({
           status: "approved",
-          responded_at: new Date().toISOString(),
+          responded_at: formatDateToYMD(normalizeDate(new Date())),
         })
         .eq("id", requestId);
 
@@ -102,6 +105,30 @@ export function useCompanyRequests() {
     }
   };
 
+  // Approve a cancellation request
+  const approveCancellation = async (requestId: string) => {
+    try {
+      const { error } = await supabase
+        .from("pld_sdv_requests")
+        .update({
+          status: "cancelled",
+          responded_at: formatDateToYMD(normalizeDate(new Date())),
+          responded_by: user?.id,
+        })
+        .eq("id", requestId);
+
+      if (error) throw error;
+
+      // Refresh requests
+      await loadRequests();
+      return true;
+    } catch (err: any) {
+      console.error("Error approving cancellation:", err);
+      setError(err.message || "Failed to approve cancellation");
+      return false;
+    }
+  };
+
   // Deny a request with a reason
   const denyRequest = async (requestId: string, reason: string) => {
     try {
@@ -109,7 +136,7 @@ export function useCompanyRequests() {
         .from("pld_sdv_requests")
         .update({
           status: "denied",
-          responded_at: new Date().toISOString(),
+          responded_at: formatDateToYMD(normalizeDate(new Date())),
           denial_reason: reason,
         })
         .eq("id", requestId);
@@ -136,6 +163,7 @@ export function useCompanyRequests() {
     isLoading,
     error,
     approveRequest,
+    approveCancellation,
     denyRequest,
     refresh: loadRequests,
   };

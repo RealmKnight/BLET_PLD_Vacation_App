@@ -14,7 +14,15 @@ import { TouchableOpacity } from "react-native";
 export default function CompanyAdmin() {
   const { user, isLoading, signOut } = useAuth();
   const router = useRouter();
-  const { requests, isLoading: requestsLoading, error, approveRequest, denyRequest, refresh } = useCompanyRequests();
+  const {
+    requests,
+    isLoading: requestsLoading,
+    error,
+    approveRequest,
+    approveCancellation,
+    denyRequest,
+    refresh,
+  } = useCompanyRequests();
 
   useEffect(() => {
     async function checkCompanyAdminAccess() {
@@ -119,6 +127,7 @@ export default function CompanyAdmin() {
           requests={requests}
           onApprove={approveRequest}
           onDeny={denyRequest}
+          onApproveCancellation={approveCancellation}
           isLoading={requestsLoading}
           onRefresh={refresh}
         />
