@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Alert,
   ScrollView,
+  Platform,
 } from "react-native";
 import { supabase } from "@/lib/supabase";
 import { usePermissions } from "@/hooks/usePermissions";
@@ -286,7 +287,7 @@ export function SDVEntitlementManager({ divisionId }: SDVEntitlementManagerProps
               onPress={() => handleSortChange("alphabetical")}
             >
               <Text style={[styles.sortButtonText, sortOption === "alphabetical" && styles.sortButtonTextActive]}>
-                Alphabetical
+                {Platform.OS === "web" ? "Alphabetical" : "Alpha"}
               </Text>
             </TouchableOpacity>
 
@@ -437,14 +438,16 @@ export function SDVEntitlementManager({ divisionId }: SDVEntitlementManagerProps
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.titleRow}>
-        <Text style={styles.title}>SDV Entitlement Manager</Text>
-        <Text style={styles.description}>
-          Manage Single Day Vacation (SDV) entitlements for members in your division. Members can have a maximum of 12
-          SDVs (6 per week split).
-        </Text>
-      </View>
+    <View style={[styles.container, Platform.OS === "web" ? null : { flex: 1 }]}>
+      {Platform.OS === "web" ? (
+        <View style={styles.titleRow}>
+          <Text style={styles.title}>SDV Entitlement Manager</Text>
+          <Text style={styles.description}>
+            Manage Single Day Vacation (SDV) entitlements for members in your division. Members can have a maximum of 12
+            SDVs (6 per week split).
+          </Text>
+        </View>
+      ) : null}
 
       {renderHeader()}
 
@@ -461,9 +464,9 @@ export function SDVEntitlementManager({ divisionId }: SDVEntitlementManagerProps
           data={filteredMembers}
           renderItem={renderMember}
           keyExtractor={(item) => getMemberKey(item)}
-          style={styles.list}
+          style={[styles.list, Platform.OS === "web" ? null : { flex: 1 }]}
           contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
+          showsVerticalScrollIndicator={true}
         />
       )}
     </View>
@@ -475,9 +478,13 @@ const styles = StyleSheet.create({
     backgroundColor: "#111111",
     borderRadius: 12,
     padding: 16,
-    marginBottom: 24,
+    marginBottom: Platform.OS === "web" ? 24 : 0,
     borderWidth: 1,
     borderColor: "#333333",
+    ...(Platform.OS !== "web" && {
+      flex: 1,
+      marginBottom: 0,
+    }),
   },
   titleRow: {
     marginBottom: 16,
@@ -685,7 +692,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   list: {
-    maxHeight: 400,
+    ...(Platform.OS === "web"
+      ? {
+          maxHeight: 400,
+        }
+      : {
+          flex: 1,
+        }),
   },
   listContent: {
     paddingBottom: 12,

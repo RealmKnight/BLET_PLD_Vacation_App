@@ -24,111 +24,113 @@ export default function DivisionDashboardScreen() {
   // Get the division ID from the member
   const divisionId = member.division || "";
 
+  const renderContent = () => {
+    switch (activeTab) {
+      case "members":
+        return (
+          <View style={[styles.section, { backgroundColor: "#000000", flex: Platform.OS === "web" ? 0 : 1 }]}>
+            <ThemedText type="subtitle" style={styles.sectionTitle}>
+              Member Management
+            </ThemedText>
+            <SDVEntitlementManager divisionId={divisionId} />
+          </View>
+        );
+      case "officers":
+        return (
+          <View style={[styles.section, { backgroundColor: "#000000" }]}>
+            <ThemedText type="subtitle" style={styles.sectionTitle}>
+              Division Officers
+            </ThemedText>
+            <View style={styles.placeholderContainer}>
+              <ThemedText style={styles.placeholderText}>Officer management features coming soon</ThemedText>
+            </View>
+          </View>
+        );
+      case "leaves":
+        return (
+          <View style={[styles.section, { backgroundColor: "#000000" }]}>
+            <ThemedText type="subtitle" style={styles.sectionTitle}>
+              Leave Requests
+            </ThemedText>
+            <View style={styles.placeholderContainer}>
+              <ThemedText style={styles.placeholderText}>Leave request management features coming soon</ThemedText>
+            </View>
+          </View>
+        );
+      case "calendar":
+        return (
+          <View style={[styles.section, { backgroundColor: "#000000" }]}>
+            <ThemedText type="subtitle" style={styles.sectionTitle}>
+              Division Calendar
+            </ThemedText>
+            <View style={styles.placeholderContainer}>
+              <ThemedText style={styles.placeholderText}>Calendar management features coming soon</ThemedText>
+            </View>
+          </View>
+        );
+      default:
+        return null;
+    }
+  };
+
+  const renderTabs = () => (
+    <View style={styles.tabContainer}>
+      <TouchableOpacity
+        style={[styles.tabButton, activeTab === "members" && styles.activeTabButton]}
+        onPress={() => setActiveTab("members")}
+      >
+        <ThemedText style={[styles.tabText, activeTab === "members" && styles.activeTabText]}>Members</ThemedText>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={[styles.tabButton, activeTab === "officers" && styles.activeTabButton]}
+        onPress={() => setActiveTab("officers")}
+      >
+        <ThemedText style={[styles.tabText, activeTab === "officers" && styles.activeTabText]}>Officers</ThemedText>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={[styles.tabButton, activeTab === "leaves" && styles.activeTabButton]}
+        onPress={() => setActiveTab("leaves")}
+      >
+        <ThemedText style={[styles.tabText, activeTab === "leaves" && styles.activeTabText]}>Leaves</ThemedText>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={[styles.tabButton, activeTab === "calendar" && styles.activeTabButton]}
+        onPress={() => setActiveTab("calendar")}
+      >
+        <ThemedText style={[styles.tabText, activeTab === "calendar" && styles.activeTabText]}>Calendar</ThemedText>
+      </TouchableOpacity>
+    </View>
+  );
+
   return (
     <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
       <ThemedView style={[styles.container, { backgroundColor: "#000000" }]}>
         <AppHeader />
         <AdminNavigation />
-        <ScrollView
-          style={[styles.scrollView, { backgroundColor: "#000000" }]}
-          contentContainerStyle={[styles.scrollContent, { backgroundColor: "#000000" }]}
-          showsVerticalScrollIndicator={false}
-        >
-          <ThemedView style={[styles.content, isMobile && styles.contentMobile, { backgroundColor: "#000000" }]}>
-            <ThemedText type="title" style={styles.title}>
-              Division Admin Dashboard
-            </ThemedText>
-            <ThemedText style={styles.text}>Manage division-specific settings and member configurations</ThemedText>
-
-            {/* Admin Tab Navigation */}
-            <View style={styles.tabContainer}>
-              <TouchableOpacity
-                style={[styles.tabButton, activeTab === "members" && styles.activeTabButton]}
-                onPress={() => setActiveTab("members")}
-              >
-                <ThemedText style={[styles.tabText, activeTab === "members" && styles.activeTabText]}>
-                  Members
-                </ThemedText>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.tabButton, activeTab === "officers" && styles.activeTabButton]}
-                onPress={() => setActiveTab("officers")}
-              >
-                <ThemedText style={[styles.tabText, activeTab === "officers" && styles.activeTabText]}>
-                  Officers
-                </ThemedText>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.tabButton, activeTab === "leaves" && styles.activeTabButton]}
-                onPress={() => setActiveTab("leaves")}
-              >
-                <ThemedText style={[styles.tabText, activeTab === "leaves" && styles.activeTabText]}>Leaves</ThemedText>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.tabButton, activeTab === "calendar" && styles.activeTabButton]}
-                onPress={() => setActiveTab("calendar")}
-              >
-                <ThemedText style={[styles.tabText, activeTab === "calendar" && styles.activeTabText]}>
-                  Calendar
-                </ThemedText>
-              </TouchableOpacity>
-            </View>
-
-            {/* Member Management Section */}
-            {activeTab === "members" && (
-              <View style={[styles.section, { backgroundColor: "#000000" }]}>
-                <ThemedText type="subtitle" style={styles.sectionTitle}>
-                  Member Management
-                </ThemedText>
-
-                {/* SDV Entitlement Manager */}
-                <SDVEntitlementManager divisionId={divisionId} />
-              </View>
-            )}
-
-            {/* Division Officers Section */}
-            {activeTab === "officers" && (
-              <View style={[styles.section, { backgroundColor: "#000000" }]}>
-                <ThemedText type="subtitle" style={styles.sectionTitle}>
-                  Division Officers
-                </ThemedText>
-                {/* Add officer management components */}
-                <View style={styles.placeholderContainer}>
-                  <ThemedText style={styles.placeholderText}>Officer management features coming soon</ThemedText>
-                </View>
-              </View>
-            )}
-
-            {/* Leave Requests Section */}
-            {activeTab === "leaves" && (
-              <View style={[styles.section, { backgroundColor: "#000000" }]}>
-                <ThemedText type="subtitle" style={styles.sectionTitle}>
-                  Leave Requests
-                </ThemedText>
-                {/* Add leave request management components */}
-                <View style={styles.placeholderContainer}>
-                  <ThemedText style={styles.placeholderText}>Leave request management features coming soon</ThemedText>
-                </View>
-              </View>
-            )}
-
-            {/* Division Calendar Section */}
-            {activeTab === "calendar" && (
-              <View style={[styles.section, { backgroundColor: "#000000" }]}>
-                <ThemedText type="subtitle" style={styles.sectionTitle}>
-                  Division Calendar
-                </ThemedText>
-                {/* Add calendar management components */}
-                <View style={styles.placeholderContainer}>
-                  <ThemedText style={styles.placeholderText}>Calendar management features coming soon</ThemedText>
-                </View>
-              </View>
-            )}
-          </ThemedView>
-        </ScrollView>
+        {Platform.OS === "web" ? (
+          <ScrollView
+            style={[styles.scrollView, { backgroundColor: "#000000" }]}
+            contentContainerStyle={[styles.scrollContent, { backgroundColor: "#000000" }]}
+            showsVerticalScrollIndicator={false}
+          >
+            <ThemedView style={[styles.content, isMobile && styles.contentMobile, { backgroundColor: "#000000" }]}>
+              <ThemedText type="title" style={styles.title}>
+                Division Admin Dashboard
+              </ThemedText>
+              <ThemedText style={styles.text}>Manage division-specific settings and member configurations</ThemedText>
+              {renderTabs()}
+              {renderContent()}
+            </ThemedView>
+          </ScrollView>
+        ) : (
+          <View style={[styles.content, isMobile && styles.contentMobile, { backgroundColor: "#000000", flex: 1 }]}>
+            {renderTabs()}
+            {renderContent()}
+          </View>
+        )}
       </ThemedView>
     </SafeAreaView>
   );
@@ -151,7 +153,7 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 20,
-    paddingTop: 0,
+    paddingTop: Platform.OS === "web" ? 0 : 16,
     maxWidth: 1200,
     alignSelf: "center",
     width: "100%",
@@ -172,7 +174,7 @@ const styles = StyleSheet.create({
   },
   tabContainer: {
     flexDirection: "row",
-    marginBottom: 24,
+    marginBottom: 16,
     borderBottomWidth: 1,
     borderBottomColor: "#333333",
   },
@@ -194,7 +196,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   section: {
-    marginBottom: 32,
+    marginBottom: Platform.OS === "web" ? 32 : 0,
   },
   sectionTitle: {
     color: "#FFFFFF",
