@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { View, Text, ActivityIndicator, StyleSheet } from "react-native";
 import { Calendar as RNCalendar, DateData } from "react-native-calendars";
-import { format, addDays, addMonths, isBefore, isAfter, startOfDay, isEqual } from "date-fns";
+import { format, addDays, addMonths, isBefore, isAfter, startOfDay, isEqual, isSameMonth } from "date-fns";
 
 import { useCalendarAllotments } from "@/hooks/useCalendarAllotments";
 
@@ -109,9 +109,10 @@ export function Calendar({ onSelectDate }: CalendarProps) {
     }
   };
 
-  const handleMonthChange = (month: DateData) => {
-    const newMonth = new Date(month.year, month.month - 1, 1);
-    setCurrentMonth(newMonth);
+  const handleMonthChange = (monthData: DateData) => {
+    // Create a new Date object for the first day of the selected month
+    const newDate = new Date(monthData.year, monthData.month - 1, 1);
+    setCurrentMonth(newDate);
   };
 
   const renderLegend = () => (
@@ -196,11 +197,13 @@ export function Calendar({ onSelectDate }: CalendarProps) {
   return (
     <View style={styles.container}>
       <RNCalendar
+        current={format(currentMonth, "yyyy-MM-dd")}
         onDayPress={handleDateSelect}
         onMonthChange={handleMonthChange}
         markedDates={markedDates}
         markingType="dot"
         maxDate={maxDateStr}
+        enableSwipeMonths={true}
         theme={{
           backgroundColor: "#000000",
           calendarBackground: "#000000",
