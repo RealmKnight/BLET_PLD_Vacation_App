@@ -45,7 +45,7 @@ export default function MyTimeScreen() {
             )}
 
             {/* Time Statistics */}
-            <TimeStats stats={timeStats} isLoading={isLoading} />
+            <TimeStats stats={timeStats} isLoading={isLoading} onRequestPaidInLieu={requestPaidInLieu} />
 
             {/* Time Off Requests */}
             <TimeOffRequestsList
