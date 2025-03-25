@@ -92,21 +92,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      isFetchingRef.current = true;
-      if (process.env.NODE_ENV !== "production") {
-        console.log("Fetching member data for user");
-      }
+      // Check if user is a company admin first
+      const { data: currentUser } = await supabase.auth.getUser();
+      const isCompanyAdmin = currentUser?.user?.user_metadata?.is_company_admin === true;
 
-      const { data: memberData, error: memberError } = await supabase
-        .from("members")
-        .select("*")
-        .eq("id", userId)
-        .maybeSingle();
-
-      if (memberError) {
-        console.error("Error fetching member");
+      if (isCompanyAdmin) {
+        if (process.env.NODE_ENV !== "production") {
+          console.log("User is a company admin, skipping member association");
+        }
         updateAuthState({
-          user,
+          user: currentUser.user,
           member: null,
           needsMemberAssociation: false,
           isLoading: false,
@@ -114,31 +109,64 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      if (memberData) {
+      // Only try to fetch member data if not a company admin
+      try {
+        isFetchingRef.current = true;
         if (process.env.NODE_ENV !== "production") {
-          console.log("Found associated member");
+          console.log("Fetching member data for user");
         }
-        // Ensure we still have the user when setting member
-        const { data: currentUser } = await supabase.auth.getUser();
+
+        const { data: memberData, error: memberError } = await supabase
+          .from("members")
+          .select("*")
+          .eq("id", userId)
+          .maybeSingle();
+
+        if (memberError) {
+          console.error("Error fetching member");
+          updateAuthState({
+            user: currentUser.user,
+            member: null,
+            needsMemberAssociation: false,
+            isLoading: false,
+          });
+          return;
+        }
+
+        if (memberData) {
+          if (process.env.NODE_ENV !== "production") {
+            console.log("Found associated member");
+          }
+          updateAuthState({
+            user: currentUser.user,
+            member: memberData,
+            needsMemberAssociation: false,
+            isLoading: false,
+          });
+          return;
+        }
+
+        // If we get here, we have no member data and user is not a company admin
+        if (process.env.NODE_ENV !== "production") {
+          console.log("No associated member found for user");
+        }
         updateAuthState({
-          user: currentUser?.user || null,
-          member: memberData,
+          user: currentUser.user,
+          member: null,
+          needsMemberAssociation: true,
+          isLoading: false,
+        });
+      } catch (error) {
+        console.error("Unexpected error in fetchMember");
+        updateAuthState({
+          user: currentUser.user,
+          member: null,
           needsMemberAssociation: false,
           isLoading: false,
         });
-        return;
+      } finally {
+        isFetchingRef.current = false;
       }
-
-      // If we get here, we have no member data
-      if (process.env.NODE_ENV !== "production") {
-        console.log("No associated member found for user");
-      }
-      updateAuthState({
-        user,
-        member: null,
-        needsMemberAssociation: true,
-        isLoading: false,
-      });
     } catch (error) {
       console.error("Unexpected error in fetchMember");
       updateAuthState({
@@ -147,8 +175,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         needsMemberAssociation: false,
         isLoading: false,
       });
-    } finally {
-      isFetchingRef.current = false;
     }
   };
 
@@ -161,14 +187,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!force && timeSinceLastCheck < 2000) {
       if (process.env.NODE_ENV !== "production") {
         console.log("Skipping session check due to debounce");
-      }
-      return;
-    }
-
-    // Don't check if we already have both user and member unless forced
-    if (!force && user && member) {
-      if (process.env.NODE_ENV !== "production") {
-        console.log("Already have user and member, skipping session check");
       }
       return;
     }
@@ -187,15 +205,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (process.env.NODE_ENV !== "production") {
           console.log("Found existing session, restoring state...");
         }
+
+        // Check if user is a company admin
+        const isCompanyAdmin = session.user.user_metadata?.is_company_admin === true;
+
+        if (isCompanyAdmin) {
+          // For company admin, skip member fetch and set state immediately
+          updateAuthState({
+            user: session.user,
+            member: null,
+            needsMemberAssociation: false,
+            isLoading: false,
+          });
+          return;
+        }
+
         // Only update state if we have a different user or force is true
         if (force || !user || user.id !== session.user.id) {
           setUser(session.user);
-          if (!member || member.id !== session.user.id) {
-            setIsLoading(true);
-            await fetchMember(session.user.id);
-          } else {
-            setIsLoading(false);
-          }
+          setIsLoading(true);
+          await fetchMember(session.user.id);
         } else {
           setIsLoading(false);
         }
@@ -254,6 +283,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log("Auth state change event:", _event, {
           hasSession: !!session,
           platform: Platform.OS,
+          isCompanyAdmin: session?.user?.user_metadata?.is_company_admin,
         });
       }
 
@@ -270,11 +300,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
+      // Check if user is a company admin
+      const isCompanyAdmin = session.user.user_metadata?.is_company_admin === true;
+
       // Only update state if we have a different user
       if (!user || user.id !== session.user.id) {
-        setUser(session.user);
-        setIsLoading(true);
-        await fetchMember(session.user.id);
+        if (isCompanyAdmin) {
+          // For company admin, skip member fetch and set state immediately
+          updateAuthState({
+            user: session.user,
+            member: null,
+            needsMemberAssociation: false,
+            isLoading: false,
+          });
+        } else {
+          // For regular users, fetch member data
+          setUser(session.user);
+          setIsLoading(true);
+          await fetchMember(session.user.id);
+        }
       }
     });
 
@@ -297,8 +341,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (process.env.NODE_ENV !== "production") {
           console.log("Tab became visible", { timeSinceLastActive });
         }
-        // Only check session if we don't have both user and member
-        if (!user || !member) {
+        // Check if current user is a company admin
+        const isCompanyAdmin = user?.user_metadata?.is_company_admin === true;
+        // Only check session if we don't have a user, or if we're not a company admin and don't have a member
+        if (!user || (!isCompanyAdmin && !member)) {
           await checkAndRestoreSession(true);
         }
         lastActiveRef.current = now;

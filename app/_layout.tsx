@@ -70,7 +70,6 @@ function RootLayoutNav() {
 
   // Add more detailed logging
   useEffect(() => {
-    // Remove detailed logging with sensitive data
     if (process.env.NODE_ENV !== "production") {
       console.log("RootLayoutNav state change:", {
         hasMember: !!member,
@@ -78,6 +77,7 @@ function RootLayoutNav() {
         isLoading,
         platform: Platform.OS,
         initialLoad,
+        isCompanyAdmin: user?.user_metadata?.is_company_admin,
       });
     }
 
@@ -157,13 +157,29 @@ function RootLayoutNav() {
     return <LoadingScreen />;
   }
 
+  // Check if user is a company admin
+  const isCompanyAdmin = user?.user_metadata?.is_company_admin === true;
+
   // Check if user is an admin
   const isAdmin = member?.role && ["division_admin", "union_admin", "application_admin"].includes(member.role);
+
+  // Determine initial route
+  let initialRoute = "(auth)";
+  if (user) {
+    if (isCompanyAdmin) {
+      initialRoute = "(company)";
+    } else if (needsMemberAssociation) {
+      initialRoute = "(member-association)";
+    } else if (member) {
+      initialRoute = "(tabs)";
+    }
+  }
 
   return (
     <>
       <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
       <Stack
+        initialRouteName={initialRoute}
         screenOptions={{
           headerShown: false,
           contentStyle: { backgroundColor: "#000000" },
@@ -172,10 +188,14 @@ function RootLayoutNav() {
           presentation: "card",
         }}
       >
-        <Stack.Screen name="(auth)" redirect={!!member || (!!user && needsMemberAssociation)} />
-        <Stack.Screen name="(member-association)" redirect={!user || !!member || !needsMemberAssociation} />
-        <Stack.Screen name="(tabs)" redirect={!member} />
-        <Stack.Screen name="(admin)" redirect={!member || !isAdmin} />
+        <Stack.Screen name="(auth)" redirect={!!member || (!!user && (needsMemberAssociation || isCompanyAdmin))} />
+        <Stack.Screen
+          name="(member-association)"
+          redirect={!user || !!member || !needsMemberAssociation || isCompanyAdmin}
+        />
+        <Stack.Screen name="(company)" redirect={!user || !isCompanyAdmin} />
+        <Stack.Screen name="(tabs)" redirect={!member || isCompanyAdmin} />
+        <Stack.Screen name="(admin)" redirect={!member || !isAdmin || isCompanyAdmin} />
         <Stack.Screen name="(profile)" options={{ animation: "slide_from_right" }} />
         <Stack.Screen name="index" redirect={true} />
       </Stack>
