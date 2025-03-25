@@ -141,16 +141,25 @@ export function TimeOffRequestsList({
       </View>
 
       <View style={styles.actionsContainer}>
-        {/* Show cancel button for pending, waitlisted, or approved that aren't paid in lieu */}
-        {(item.status === "pending" ||
-          item.status === "waitlisted" ||
-          (item.status === "approved" && !item.paidInLieu)) && (
+        {/* Show cancel button for pending requests */}
+        {item.status === "pending" && (
           <TouchableOpacity
             style={styles.actionButton}
             onPress={() => openCancelConfirmation(item)}
-            disabled={actionInProgress === item.id || item.status === "cancellation_pending"}
+            disabled={actionInProgress === item.id}
           >
             <Feather name="x-circle" size={22} color="#EF4444" />
+          </TouchableOpacity>
+        )}
+
+        {/* Show cancel button for approved or waitlisted requests */}
+        {(item.status === "waitlisted" || (item.status === "approved" && !item.paidInLieu)) && (
+          <TouchableOpacity
+            style={[styles.actionButton, styles.requestCancelButton]}
+            onPress={() => openCancelConfirmation(item)}
+            disabled={actionInProgress === item.id}
+          >
+            <Feather name="clock" size={22} color="#F59E0B" />
           </TouchableOpacity>
         )}
 
@@ -336,5 +345,8 @@ const styles = StyleSheet.create({
   cancellationPendingText: {
     color: "#EF4444",
     fontStyle: "italic",
+  },
+  requestCancelButton: {
+    backgroundColor: "#F59E0B",
   },
 });

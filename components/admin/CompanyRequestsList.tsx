@@ -18,7 +18,7 @@ import { parseYMDDate } from "@/utils/date";
 interface CompanyRequestsListProps {
   requests: CompanyRequest[];
   onApprove: (requestId: string) => Promise<boolean>;
-  onDeny: (requestId: string) => Promise<boolean>;
+  onDeny: (requestId: string, reason: string) => Promise<boolean>;
   onApproveCancellation: (requestId: string) => Promise<boolean>;
   isLoading: boolean;
   onRefresh: () => Promise<void>;
@@ -61,7 +61,7 @@ export function CompanyRequestsList({
     if (!selectedRequest) return;
 
     setActionInProgress(selectedRequest.id);
-    const success = await onDeny(selectedRequest.id);
+    const success = await onDeny(selectedRequest.id, reason);
     setActionInProgress(null);
 
     if (!success) {
@@ -108,9 +108,9 @@ export function CompanyRequestsList({
             disabled={actionInProgress === item.id}
           >
             {actionInProgress === item.id ? (
-              <ActivityIndicator size="small" color="#000000" />
+              <ActivityIndicator size="small" color="#34D399" />
             ) : (
-              <Text style={styles.actionButtonText}>Approve Cancellation</Text>
+              <Feather name="check" size={24} color="#34D399" />
             )}
           </TouchableOpacity>
         ) : (
@@ -121,20 +121,20 @@ export function CompanyRequestsList({
               disabled={actionInProgress === item.id}
             >
               {actionInProgress === item.id ? (
-                <ActivityIndicator size="small" color="#000000" />
+                <ActivityIndicator size="small" color="#34D399" />
               ) : (
-                <Text style={styles.actionButtonText}>Approve</Text>
+                <Feather name="check" size={24} color="#34D399" />
               )}
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.actionButton, styles.denyButton]}
-              onPress={() => handleDeny(item.id)}
+              onPress={() => openDenialModal(item)}
               disabled={actionInProgress === item.id}
             >
               {actionInProgress === item.id ? (
                 <ActivityIndicator size="small" color="#FFFFFF" />
               ) : (
-                <Text style={[styles.actionButtonText, styles.denyButtonText]}>Deny</Text>
+                <Feather name="x" size={24} color="#FFFFFF" />
               )}
             </TouchableOpacity>
           </>
@@ -191,9 +191,9 @@ export function CompanyRequestsList({
                   disabled={actionInProgress === request.id}
                 >
                   {actionInProgress === request.id ? (
-                    <ActivityIndicator size="small" color="#000000" />
+                    <ActivityIndicator size="small" color="#34D399" />
                   ) : (
-                    <Text style={styles.actionButtonText}>Approve Cancellation</Text>
+                    <Feather name="check" size={24} color="#34D399" />
                   )}
                 </TouchableOpacity>
               ) : (
@@ -204,21 +204,21 @@ export function CompanyRequestsList({
                     disabled={actionInProgress === request.id}
                   >
                     {actionInProgress === request.id ? (
-                      <ActivityIndicator size="small" color="#000000" />
+                      <ActivityIndicator size="small" color="#34D399" />
                     ) : (
-                      <Text style={styles.actionButtonText}>Approve</Text>
+                      <Feather name="check" size={24} color="#34D399" />
                     )}
                   </TouchableOpacity>
 
                   <TouchableOpacity
                     style={[styles.actionButton, styles.denyButton]}
-                    onPress={() => handleDeny(request.id)}
+                    onPress={() => openDenialModal(request)}
                     disabled={actionInProgress === request.id}
                   >
                     {actionInProgress === request.id ? (
                       <ActivityIndicator size="small" color="#FFFFFF" />
                     ) : (
-                      <Text style={[styles.actionButtonText, styles.denyButtonText]}>Deny</Text>
+                      <Feather name="x" size={24} color="#FFFFFF" />
                     )}
                   </TouchableOpacity>
                 </>

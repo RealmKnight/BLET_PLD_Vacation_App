@@ -177,6 +177,8 @@ export type Database = {
           responded_by: string | null;
           status: Database["public"]["Enums"]["pld_sdv_status"];
           waitlist_position: number | null;
+          cancelled_by: string | null;
+          cancelled_at: string | null;
         };
         Insert: {
           division: string;
@@ -190,6 +192,8 @@ export type Database = {
           responded_by?: string | null;
           status?: Database["public"]["Enums"]["pld_sdv_status"];
           waitlist_position?: number | null;
+          cancelled_by?: string | null;
+          cancelled_at?: string | null;
         };
         Update: {
           division?: string;
@@ -203,6 +207,8 @@ export type Database = {
           responded_by?: string | null;
           status?: Database["public"]["Enums"]["pld_sdv_status"];
           waitlist_position?: number | null;
+          cancelled_by?: string | null;
+          cancelled_at?: string | null;
         };
         Relationships: [];
       };
@@ -211,7 +217,10 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
-      [_ in never]: never;
+      cancel_pending_request: {
+        Args: Record<string, unknown>;
+        Returns: boolean;
+      };
     };
     Enums: {
       division: "163" | "173" | "174" | "175" | "184" | "185" | "188" | "209" | "520";

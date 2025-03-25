@@ -3,6 +3,8 @@ import { differenceInYears } from "date-fns";
 import { supabase } from "@/lib/supabase";
 import { getCurrentMember } from "@/lib/supabase";
 import { normalizeDate } from "@/utils/date";
+import { useAuth } from "@/contexts/AuthContext";
+import { SupabaseClient } from "@supabase/supabase-js";
 
 // Types for the hook
 export interface TimeStats {
@@ -32,6 +34,15 @@ export interface TimeStats {
   };
 }
 
+// Add type for RPC functions
+type Database = {
+  rpc: {
+    cancel_pending_request: {
+      (args: { request_id: string; user_id: string }): Promise<{ data: boolean; error: any }>;
+    };
+  };
+};
+
 export interface TimeOffRequest {
   id: string;
   requestDate: string;
@@ -41,6 +52,8 @@ export interface TimeOffRequest {
   waitlistPosition?: number;
   paidInLieu?: boolean;
   respondedAt?: string;
+  cancelledBy?: string;
+  cancelledAt?: string;
 }
 
 export function useMyTime() {
@@ -56,6 +69,7 @@ export function useMyTime() {
   const [timeOffRequests, setTimeOffRequests] = useState<TimeOffRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { user } = useAuth();
 
   // Calculate PLD entitlement based on years of service
   const calculatePldEntitlement = (hireDate: string | null, override: number | null): number => {
@@ -144,6 +158,8 @@ export function useMyTime() {
             waitlistPosition: request.waitlist_position || undefined,
             paidInLieu: request.paid_in_lieu || false,
             respondedAt: request.responded_at || undefined,
+            cancelledBy: request.cancelled_by || undefined,
+            cancelledAt: request.cancelled_at || undefined,
           };
         }) || [];
 
@@ -173,15 +189,35 @@ export function useMyTime() {
   // Cancel a request
   const cancelRequest = async (requestId: string) => {
     try {
-      const { error } = await supabase
-        .from("pld_sdv_requests")
-        .update({
-          status: "cancellation_pending",
-          responded_at: null,
-        })
-        .eq("id", requestId);
+      const { data: request } = await supabase.from("pld_sdv_requests").select("status").eq("id", requestId).single();
 
-      if (error) throw error;
+      if (!request) {
+        throw new Error("Request not found");
+      }
+
+      if (request.status === "pending" && user?.id) {
+        // Use the new direct cancellation for pending requests
+        const { data, error } = await supabase.rpc("cancel_pending_request", {
+          request_id: requestId,
+          user_id: user.id,
+        });
+
+        if (error) throw error;
+        if (!data) {
+          throw new Error("Failed to cancel request");
+        }
+      } else {
+        // For non-pending requests, use the existing cancellation flow
+        const { error } = await supabase
+          .from("pld_sdv_requests")
+          .update({
+            status: "cancellation_pending",
+            responded_at: null,
+          })
+          .eq("id", requestId);
+
+        if (error) throw error;
+      }
 
       // Refresh time data
       await loadTimeData();

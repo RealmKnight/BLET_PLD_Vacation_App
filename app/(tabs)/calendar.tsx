@@ -79,12 +79,16 @@ export default function CalendarScreen() {
 
   const handleSubmitRequest = async (type: "PLD" | "SDV") => {
     setIsModalVisible(false);
+    // Add a delay to ensure the database trigger has completed
+    await new Promise((resolve) => setTimeout(resolve, 1000));
     // Refresh time data to update available days
     await refreshTimeData();
+    // Ensure we're viewing the month of the requested date
+    if (selectedDate) {
+      setCurrentViewDate(new Date(selectedDate));
+    }
     // Refresh allotments to update the calendar
     await refreshAllotments();
-    // Force a re-render of the calendar by updating the currentViewDate
-    setCurrentViewDate(new Date(currentViewDate));
   };
 
   const handleJumpToDate = () => {
