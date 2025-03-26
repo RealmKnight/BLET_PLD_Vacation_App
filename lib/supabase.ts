@@ -78,7 +78,7 @@ export async function getCurrentUser() {
 }
 
 // Helper to get the current user's member profile
-export async function getCurrentMember() {
+export async function getCurrentMember(): Promise<Database["public"]["Tables"]["members"]["Row"] | null> {
   const user = await getCurrentUser();
   if (!user) return null;
 

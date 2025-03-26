@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { View, Text, ActivityIndicator, StyleSheet } from "react-native";
 import { Calendar as RNCalendar, DateData } from "react-native-calendars";
 import { format, addDays, addMonths, isBefore, isAfter, startOfDay, isEqual, isSameMonth } from "date-fns";
-import { useCalendarAllotments } from "@/hooks/useCalendarAllotments";
 import { formatDateToYMD, normalizeDate, parseYMDDate } from "@/utils/date";
+import { useCalendarStore } from "@/store/calendarStore";
 
 interface CalendarProps {
   onSelectDate?: (date: Date) => void;
@@ -12,141 +12,158 @@ interface CalendarProps {
 }
 
 export function Calendar({ onSelectDate, currentViewDate, onChangeViewDate }: CalendarProps) {
-  const [currentMonth, setCurrentMonth] = useState(normalizeDate(currentViewDate || new Date()));
   const [selectedDate, setSelectedDate] = useState(formatDateToYMD(currentViewDate || new Date()));
   const [markedDates, setMarkedDates] = useState<any>({});
 
-  const { allotments, isLoading, error, refresh } = useCalendarAllotments(currentMonth);
+  const {
+    allotments,
+    isLoading,
+    error,
+    userDivision,
+    currentMonth: storeMonth,
+    setCurrentMonth: setStoreMonth,
+    fetchAllotments,
+    initialize,
+  } = useCalendarStore();
 
-  // Update internal state when currentViewDate prop changes
+  // Initialize the store
   useEffect(() => {
-    if (currentViewDate) {
-      const normalized = normalizeDate(currentViewDate);
-      setCurrentMonth(normalized);
-      // Only update selected date if it's a new date (to prevent overriding user selections)
-      if (!isSameMonth(normalized, currentMonth)) {
-        setSelectedDate(formatDateToYMD(normalized));
-      }
-      // Refresh allotments when view date changes
-      refresh();
-    }
+    const cleanup = initialize();
+    return () => cleanup();
+  }, [initialize]);
+
+  // Memoize the normalized current view date
+  const normalizedCurrentViewDate = useMemo(() => {
+    return normalizeDate(currentViewDate || new Date());
   }, [currentViewDate]);
+
+  // Update store month when currentViewDate prop changes
+  useEffect(() => {
+    if (!isEqual(normalizedCurrentViewDate, storeMonth)) {
+      setStoreMonth(normalizedCurrentViewDate);
+    }
+  }, [normalizedCurrentViewDate, storeMonth, setStoreMonth]);
+
+  // Fetch allotments when month or division changes
+  useEffect(() => {
+    if (userDivision && storeMonth) {
+      fetchAllotments(storeMonth, userDivision);
+    }
+  }, [storeMonth, userDivision, fetchAllotments]);
 
   // Calculate the minimum and maximum allowed request dates
   const dateRanges = useMemo(() => {
     const today = normalizeDate(new Date());
     return {
-      minAllowedDate: normalizeDate(addDays(today, 2)), // Min: current date + 2 days (48 hours)
-      maxAllowedDate: normalizeDate(addMonths(today, 6)), // Max: current date + 6 months
+      minAllowedDate: normalizeDate(addDays(today, 2)),
+      maxAllowedDate: normalizeDate(addMonths(today, 6)),
     };
   }, []);
 
   // Check if a date is eligible for requests (within allowed range)
-  const isDateEligibleForRequest = (date: Date) => {
-    const normalized = normalizeDate(date);
-    return !isBefore(normalized, dateRanges.minAllowedDate) && !isAfter(normalized, dateRanges.maxAllowedDate);
-  };
+  const isDateEligibleForRequest = useCallback(
+    (date: Date) => {
+      const normalized = normalizeDate(date);
+      return !isBefore(normalized, dateRanges.minAllowedDate) && !isAfter(normalized, dateRanges.maxAllowedDate);
+    },
+    [dateRanges]
+  );
+
+  // Memoize the handleDateSelect callback
+  const handleDateSelect = useCallback(
+    (day: DateData) => {
+      const dateStr = day.dateString;
+      const selectedDateObj = normalizeDate(dateStr);
+
+      if (isDateEligibleForRequest(selectedDateObj)) {
+        setSelectedDate(dateStr);
+        if (onSelectDate) {
+          onSelectDate(selectedDateObj);
+        }
+      }
+    },
+    [isDateEligibleForRequest, onSelectDate]
+  );
+
+  // Memoize the handleMonthChange callback
+  const handleMonthChange = useCallback(
+    (monthData: DateData) => {
+      const newDate = normalizeDate(new Date(monthData.year, monthData.month - 1, 1));
+      setStoreMonth(newDate);
+      if (onChangeViewDate) {
+        onChangeViewDate(newDate);
+      }
+    },
+    [setStoreMonth, onChangeViewDate]
+  );
 
   // Update marked dates when allotments change
   useEffect(() => {
-    if (!isLoading && !error) {
-      const newMarkedDates: any = {};
-      const today = normalizeDate(new Date());
+    if (isLoading || !storeMonth) return;
 
-      // Get all dates for the current month display
-      const firstDayOfMonth = normalizeDate(new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1));
-      const lastDayOfMonth = normalizeDate(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0));
+    const newMarkedDates: any = {};
+    const firstDayOfMonth = normalizeDate(new Date(storeMonth.getFullYear(), storeMonth.getMonth(), 1));
+    const lastDayOfMonth = normalizeDate(new Date(storeMonth.getFullYear(), storeMonth.getMonth() + 1, 0));
 
-      // Colors for different states (using our brand colors)
-      const colors = {
-        available: "#BAC42A", // green
-        limited: "#F59E0B", // amber/orange
-        full: "#EF4444", // red
-        restricted: "#6B7280", // gray
-        unavailable: "#6B7280", // gray
-      };
+    const colors = {
+      available: "#BAC42A",
+      limited: "#F59E0B",
+      full: "#EF4444",
+      restricted: "#6B7280",
+      unavailable: "#6B7280",
+    };
 
-      // Mark all days in the visible month range
-      for (let d = new Date(firstDayOfMonth); d <= lastDayOfMonth; d.setDate(d.getDate() + 1)) {
-        const dateStr = formatDateToYMD(d);
-        const allotment = allotments[dateStr];
-        const isEligible = isDateEligibleForRequest(d);
-        const isSelected = dateStr === selectedDate;
+    for (let d = new Date(firstDayOfMonth); d <= lastDayOfMonth; d.setDate(d.getDate() + 1)) {
+      const dateStr = formatDateToYMD(d);
+      const allotment = allotments[dateStr];
+      const isEligible = isDateEligibleForRequest(d);
+      const isSelected = dateStr === selectedDate;
 
-        let backgroundColor = colors.unavailable;
-        let textColor = "#FFFFFF"; // Default text color is white
-        let disabledDate = false;
+      let backgroundColor = colors.unavailable;
+      let textColor = "#FFFFFF";
+      let disabledDate = false;
 
-        // Check if date is outside allowed range (too early or too late)
-        if (!isEligible) {
+      if (!isEligible) {
+        backgroundColor = colors.restricted;
+        disabledDate = true;
+        textColor = "#CCCCCC";
+      } else if (allotment && allotment.maxAllotment > 0) {
+        if (allotment.availability === "available") {
+          backgroundColor = colors.available;
+          textColor = "#000000";
+        } else if (allotment.availability === "limited") {
+          backgroundColor = colors.limited;
+          textColor = "#000000";
+        } else if (allotment.availability === "full") {
+          backgroundColor = colors.full;
+        } else if (allotment.availability === "restricted") {
           backgroundColor = colors.restricted;
           disabledDate = true;
-          textColor = "#CCCCCC"; // Light gray text for unavailable dates
-        } else if (allotment && allotment.maxAllotment > 0) {
-          if (allotment.availability === "available") {
-            backgroundColor = colors.available;
-            textColor = "#000000"; // Black text on green background for better contrast
-          } else if (allotment.availability === "limited") {
-            backgroundColor = colors.limited;
-            textColor = "#000000"; // Black text on orange background for better contrast
-          } else if (allotment.availability === "full") {
-            backgroundColor = colors.full;
-          } else if (allotment.availability === "restricted") {
-            backgroundColor = colors.restricted;
-            disabledDate = true;
-            textColor = "#CCCCCC"; // Light gray text for restricted dates
-          }
+          textColor = "#CCCCCC";
         }
+      }
 
-        newMarkedDates[dateStr] = {
-          selected: isSelected && !disabledDate,
-          selectedColor: "#BAC42A", // brand green for selection
-          customStyles: {
-            container: {
-              backgroundColor: isSelected && !disabledDate ? "#BAC42A" : backgroundColor,
-              borderRadius: 16,
-            },
-            text: {
-              color: isSelected && !disabledDate ? "#000000" : textColor,
-              fontWeight: isSelected ? "bold" : "normal",
-            },
+      newMarkedDates[dateStr] = {
+        selected: isSelected && !disabledDate,
+        selectedColor: "#BAC42A",
+        customStyles: {
+          container: {
+            backgroundColor: isSelected && !disabledDate ? "#BAC42A" : backgroundColor,
+            borderRadius: 16,
           },
-          disabled: disabledDate,
-          disableTouchEvent: disabledDate,
-          allotment: allotment,
-        };
-      }
-
-      setMarkedDates(newMarkedDates);
+          text: {
+            color: isSelected && !disabledDate ? "#000000" : textColor,
+            fontWeight: isSelected ? "bold" : "normal",
+          },
+        },
+        disabled: disabledDate,
+        disableTouchEvent: disabledDate,
+        allotment: allotment,
+      };
     }
-  }, [allotments, isLoading, error, selectedDate, dateRanges, currentMonth]);
 
-  const handleDateSelect = (day: DateData) => {
-    const dateStr = day.dateString;
-    const selectedDateObj = normalizeDate(dateStr);
-
-    // Only allow selection of eligible dates
-    if (isDateEligibleForRequest(selectedDateObj)) {
-      setSelectedDate(dateStr);
-
-      // Pass the selected date to parent
-      if (onSelectDate) {
-        onSelectDate(selectedDateObj);
-      }
-    }
-  };
-
-  const handleMonthChange = (monthData: DateData) => {
-    // Create a new Date object for the first day of the selected month
-    const newDate = normalizeDate(new Date(monthData.year, monthData.month - 1, 1));
-
-    setCurrentMonth(newDate);
-
-    // Notify parent component about the month change
-    if (onChangeViewDate) {
-      onChangeViewDate(newDate);
-    }
-  };
+    setMarkedDates(newMarkedDates);
+  }, [allotments, isLoading, selectedDate, storeMonth, isDateEligibleForRequest]);
 
   const renderSelectedDate = () => {
     if (!selectedDate || !allotments[selectedDate]) {
@@ -206,7 +223,7 @@ export function Calendar({ onSelectDate, currentViewDate, onChangeViewDate }: Ca
   return (
     <View style={styles.container}>
       <RNCalendar
-        current={format(currentMonth, "yyyy-MM-dd")}
+        current={format(storeMonth, "yyyy-MM-dd")}
         minDate={minDateStr}
         maxDate={maxDateStr}
         onDayPress={handleDateSelect}

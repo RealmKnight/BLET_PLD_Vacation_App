@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, Image, Platform, ScrollView } from "react-native";
 import { format, addDays, addMonths, isBefore, isAfter, startOfDay, parseISO } from "date-fns";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -8,7 +8,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { getCurrentMember } from "@/lib/supabase";
 import { TextInput } from "react-native";
 import { useMyTime } from "@/hooks/useMyTime";
-import { useCalendarAllotments } from "@/hooks/useCalendarAllotments";
+import { useCalendarStore } from "@/store/calendarStore";
 
 export default function CalendarScreen() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -19,26 +19,26 @@ export default function CalendarScreen() {
     return today;
   });
   const [isModalVisible, setIsModalVisible] = useState(false);
-  const [userDivision, setUserDivision] = useState<string>("174"); // Default to division 174 but will be updated
   const [dateInputValue, setDateInputValue] = useState<string>("");
   const { refresh: refreshTimeData } = useMyTime();
-  const { refresh: refreshAllotments } = useCalendarAllotments(currentViewDate);
+  const { userDivision, setUserDivision } = useCalendarStore();
+
+  // Memoize loadUserData to prevent unnecessary recreations
+  const loadUserData = useCallback(async () => {
+    try {
+      const member = await getCurrentMember();
+      if (member?.division) {
+        setUserDivision(member.division);
+      }
+    } catch (error) {
+      console.error("Error fetching user division:", error);
+    }
+  }, [setUserDivision]);
 
   // Fetch the user's division when component mounts
   useEffect(() => {
-    async function loadUserData() {
-      try {
-        const member = await getCurrentMember();
-        if (member?.division) {
-          setUserDivision(member.division);
-        }
-      } catch (error) {
-        console.error("Error fetching user division:", error);
-      }
-    }
-
     loadUserData();
-  }, []);
+  }, [loadUserData]);
 
   // Calculate the allowed date range
   const dateRanges = useMemo(() => {
@@ -63,35 +63,44 @@ export default function CalendarScreen() {
     return { isEligible, isTooEarly, isTooLate };
   }, [selectedDate, dateRanges]);
 
-  const handleDateSelect = (date: Date) => {
+  // Memoize handlers
+  const handleDateSelect = useCallback((date: Date) => {
     // Make sure to set the time to noon to avoid timezone issues
     date.setHours(12, 0, 0, 0);
     setSelectedDate(date);
-  };
+  }, []);
 
-  const handleRequestPress = () => {
+  const handleRequestPress = useCallback(() => {
     setIsModalVisible(true);
-  };
+  }, []);
 
-  const handleCloseModal = () => {
+  const handleCloseModal = useCallback(() => {
     setIsModalVisible(false);
-  };
+  }, []);
 
-  const handleSubmitRequest = async (type: "PLD" | "SDV") => {
-    setIsModalVisible(false);
-    // Add a delay to ensure the database trigger has completed
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    // Refresh time data to update available days
-    await refreshTimeData();
-    // Ensure we're viewing the month of the requested date
-    if (selectedDate) {
-      setCurrentViewDate(new Date(selectedDate));
-    }
-    // Refresh allotments to update the calendar
-    await refreshAllotments();
-  };
+  const handleSubmitRequest = useCallback(
+    async (type: "PLD" | "SDV") => {
+      setIsModalVisible(false);
 
-  const handleJumpToDate = () => {
+      try {
+        // Batch the async operations
+        await Promise.all([
+          new Promise((resolve) => setTimeout(resolve, 1000)), // Wait for DB trigger
+          refreshTimeData(),
+        ]);
+
+        // Only update view date if we have a selected date
+        if (selectedDate) {
+          setCurrentViewDate(new Date(selectedDate));
+        }
+      } catch (error) {
+        console.error("Error in handleSubmitRequest:", error);
+      }
+    },
+    [selectedDate, refreshTimeData]
+  );
+
+  const handleJumpToDate = useCallback(() => {
     try {
       // Check if the input is a valid date format (yyyy-MM-dd)
       if (/^\d{4}-\d{2}-\d{2}$/.test(dateInputValue)) {
@@ -109,16 +118,16 @@ export default function CalendarScreen() {
     } catch (error) {
       console.error("Invalid date format:", error);
     }
-  };
+  }, [dateInputValue]);
 
-  const handleGoToToday = () => {
+  const handleGoToToday = useCallback(() => {
     const today = new Date();
     // Set time to noon to avoid timezone issues
     today.setHours(12, 0, 0, 0);
 
     setCurrentViewDate(today);
     setSelectedDate(today);
-  };
+  }, []);
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
@@ -181,7 +190,7 @@ export default function CalendarScreen() {
           <RequestModal
             visible={isModalVisible}
             date={selectedDate}
-            division={userDivision}
+            division={userDivision || ""}
             onClose={handleCloseModal}
             onSubmit={handleSubmitRequest}
           />

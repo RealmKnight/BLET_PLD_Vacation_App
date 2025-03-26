@@ -1,46 +1,44 @@
 import { useState } from "react";
+import { Alert } from "react-native";
 import { supabase } from "@/lib/supabase";
 import { getCurrentMember } from "@/lib/supabase";
-import { Alert } from "react-native";
-import { formatDateToYMD, normalizeDate } from "@/utils/date";
-import { Database } from "@/types/supabase";
+import { format } from "date-fns";
+import { useTimeStore } from "@/store/timeStore";
 
 export function useTimeOffRequests() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { refresh: refreshTimeData } = useTimeStore();
 
   const submitRequest = async (date: Date, type: "PLD" | "SDV", division: string) => {
-    if (isSubmitting) return null; // Prevent double submission
-
     setIsSubmitting(true);
     setError(null);
 
     try {
+      // Get current member
       const member = await getCurrentMember();
-      if (!member || !member.id) {
+      if (!member?.id) {
         throw new Error("Unable to load member data");
       }
 
-      // Format date using our utility function
-      const formattedDate = formatDateToYMD(normalizeDate(date));
+      // Format date for database
+      const formattedDate = format(date, "yyyy-MM-dd");
 
-      // Check for any existing active requests for this date
+      // Check for existing requests
       const { data: existingRequests, error: checkError } = await supabase
         .from("pld_sdv_requests")
-        .select("leave_type, status")
+        .select("id, status")
         .eq("member_id", member.id)
         .eq("request_date", formattedDate)
         .in("status", ["pending", "approved", "waitlisted", "cancellation_pending"]);
 
-      if (checkError) {
-        throw checkError;
-      }
+      if (checkError) throw checkError;
 
       if (existingRequests && existingRequests.length > 0) {
-        const message = `You already have an active ${existingRequests[0].leave_type} request for this date (${existingRequests[0].status}). Please cancel it first if you want to make a new request.`;
-        setError(message);
-        Alert.alert("Active Request Exists", message);
-        return null;
+        const errorMessage = "You already have an active request for this date";
+        setError(errorMessage);
+        Alert.alert("Request Failed", errorMessage);
+        return false;
       }
 
       // Submit the request
@@ -58,29 +56,30 @@ export function useTimeOffRequests() {
         .single();
 
       if (requestError) {
-        // Handle database errors
         const errorMessage = requestError.message || "An unexpected error occurred";
         setError(errorMessage);
         Alert.alert("Request Failed", errorMessage);
-        return null;
+        return false;
       }
+
+      // Refresh time data in the store
+      await refreshTimeData();
 
       Alert.alert(
         "Request Submitted",
         `Your ${type} request for ${formattedDate} has been submitted and is pending approval.`
       );
 
-      return request;
+      return true;
     } catch (err: any) {
       console.error("Error submitting request:", err);
       const errorMessage = err.message || "Failed to submit request";
       setError(errorMessage);
 
-      // Only show alert if one hasn't been shown already
       if (!err.message?.includes("active request already exists")) {
         Alert.alert("Error", "Failed to submit request. Please try again later.");
       }
-      return null;
+      return false;
     } finally {
       setIsSubmitting(false);
     }

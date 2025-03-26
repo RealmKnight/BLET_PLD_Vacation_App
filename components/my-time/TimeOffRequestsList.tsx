@@ -1,102 +1,42 @@
-import React, { useState } from "react";
-import { StyleSheet, View, Text, TouchableOpacity, FlatList, Alert } from "react-native";
+import React from "react";
+import { StyleSheet, View, Text, TouchableOpacity, FlatList } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { TimeOffRequest } from "@/hooks/useMyTime";
-import { ConfirmationModal } from "./ConfirmationModal";
-import { formatDateToYMD, normalizeDate, parseYMDDate } from "@/utils/date";
-import { format } from "date-fns";
-import { useCalendarAllotments } from "@/hooks/useCalendarAllotments";
+import { parseYMDDate } from "@/utils/date";
 
 interface TimeOffRequestsListProps {
   requests: TimeOffRequest[];
-  onCancel: (requestId: string) => Promise<boolean>;
-  onRequestPaidInLieu: (requestId: string) => Promise<boolean>;
+  onCancelRequest: (request: TimeOffRequest) => void;
+  onRequestPaidInLieu: (request: TimeOffRequest) => void;
   isLoading: boolean;
   showWaitlisted?: boolean;
+  actionInProgress: string | null;
 }
 
 export function TimeOffRequestsList({
   requests,
-  onCancel,
+  onCancelRequest,
   onRequestPaidInLieu,
   isLoading,
   showWaitlisted = false,
+  actionInProgress,
 }: TimeOffRequestsListProps) {
-  const [actionInProgress, setActionInProgress] = useState<string | null>(null);
-  const [selectedRequest, setSelectedRequest] = useState<TimeOffRequest | null>(null);
-  const [modalType, setModalType] = useState<"cancel" | "paidInLieu" | null>(null);
-
-  // Get the calendar allotments functions
-  const { refreshDate } = useCalendarAllotments(new Date());
-
-  // Filter requests based on status (waitlisted or not)
-  const filteredRequests = requests.filter((request) => {
-    if (showWaitlisted) {
-      return request.status === "waitlisted";
-    } else {
-      return request.status !== "waitlisted" && request.status !== "cancelled";
-    }
-  });
-
-  // Format date function using our utility
-  const formatDate = (dateString: string) => {
-    const normalizedDate = parseYMDDate(dateString);
-    return format(normalizedDate, "MMM d, yyyy");
-  };
-
-  // Open cancel confirmation modal
-  const openCancelConfirmation = (request: TimeOffRequest) => {
-    setSelectedRequest(request);
-    setModalType("cancel");
-  };
-
-  // Open paid in lieu confirmation modal
-  const openPaidInLieuConfirmation = (request: TimeOffRequest) => {
-    setSelectedRequest(request);
-    setModalType("paidInLieu");
-  };
-
-  // Close modal
-  const closeModal = () => {
-    setModalType(null);
-    setSelectedRequest(null);
-  };
-
-  // Handle cancel confirmation
-  const handleCancelConfirm = async () => {
-    if (!selectedRequest) return;
-
-    setActionInProgress(selectedRequest.id);
-    const success = await onCancel(selectedRequest.id);
-    setActionInProgress(null);
-
-    if (success) {
-      // Refresh the allotments for the specific date that was cancelled
-      const requestDate = parseYMDDate(selectedRequest.requestDate);
-      await refreshDate(requestDate);
-    } else {
-      Alert.alert("Error", "Failed to cancel request. Please try again.");
-    }
-
-    closeModal();
-  };
-
-  // Handle paid in lieu confirmation
-  const handlePaidInLieuConfirm = async () => {
-    if (!selectedRequest) return;
-
-    setActionInProgress(selectedRequest.id);
-    const success = await onRequestPaidInLieu(selectedRequest.id);
-    setActionInProgress(null);
-
-    if (!success) {
-      Alert.alert("Error", "Failed to request paid in lieu. Please try again.");
-    } else {
-      Alert.alert("Success", "Your request has been submitted for payment in lieu.");
-    }
-
-    closeModal();
-  };
+  // Filter and sort requests
+  const filteredRequests = requests
+    .filter((request) => {
+      if (showWaitlisted) {
+        return request.status === "waitlisted";
+      } else {
+        return request.status !== "waitlisted" && request.status !== "cancelled";
+      }
+    })
+    .sort((a, b) => {
+      // Convert dates to Date objects for comparison
+      const dateA = parseYMDDate(a.requestDate);
+      const dateB = parseYMDDate(b.requestDate);
+      // Sort ascending (closest dates first)
+      return dateA.getTime() - dateB.getTime();
+    });
 
   if (isLoading) {
     return (
@@ -118,7 +58,7 @@ export function TimeOffRequestsList({
     <View style={[styles.requestItem, item.status === "cancellation_pending" && styles.cancellationPending]}>
       <View style={styles.requestInfo}>
         <View style={styles.dateContainer}>
-          <Text style={styles.dateText}>{formatDate(item.requestDate)}</Text>
+          <Text style={styles.dateText}>{item.requestDate}</Text>
           <View style={[styles.typeBadge, item.leaveType === "PLD" ? styles.pldBadge : styles.sdvBadge]}>
             <Text style={styles.typeText}>{item.leaveType}</Text>
           </View>
@@ -153,7 +93,7 @@ export function TimeOffRequestsList({
         {item.status === "pending" && (
           <TouchableOpacity
             style={styles.actionButton}
-            onPress={() => openCancelConfirmation(item)}
+            onPress={() => onCancelRequest(item)}
             disabled={actionInProgress === item.id}
           >
             <Feather name="x-circle" size={22} color="#EF4444" />
@@ -164,7 +104,7 @@ export function TimeOffRequestsList({
         {(item.status === "waitlisted" || (item.status === "approved" && !item.paidInLieu)) && (
           <TouchableOpacity
             style={[styles.actionButton, styles.requestCancelButton]}
-            onPress={() => openCancelConfirmation(item)}
+            onPress={() => onCancelRequest(item)}
             disabled={actionInProgress === item.id}
           >
             <Feather name="clock" size={22} color="#F59E0B" />
@@ -175,7 +115,7 @@ export function TimeOffRequestsList({
         {item.status === "approved" && !item.paidInLieu && (
           <TouchableOpacity
             style={styles.actionButton}
-            onPress={() => openPaidInLieuConfirmation(item)}
+            onPress={() => onRequestPaidInLieu(item)}
             disabled={actionInProgress === item.id}
           >
             <Feather name="dollar-sign" size={22} color="#BAC42A" />
@@ -195,40 +135,6 @@ export function TimeOffRequestsList({
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
       />
-
-      {/* Cancel Confirmation Modal */}
-      {selectedRequest && modalType === "cancel" && (
-        <ConfirmationModal
-          visible={true}
-          title="Cancel Request"
-          message={`Are you sure you want to cancel your ${selectedRequest.leaveType} request for ${formatDate(
-            selectedRequest.requestDate
-          )}?`}
-          confirmText="Cancel Request"
-          cancelText="Keep Request"
-          onConfirm={handleCancelConfirm}
-          onCancel={closeModal}
-          isLoading={actionInProgress === selectedRequest.id}
-          destructive={true}
-        />
-      )}
-
-      {/* Paid in Lieu Confirmation Modal */}
-      {selectedRequest && modalType === "paidInLieu" && (
-        <ConfirmationModal
-          visible={true}
-          title="Request Paid in Lieu"
-          message={`Are you sure you want to request ${selectedRequest.leaveType} for ${formatDate(
-            selectedRequest.requestDate
-          )} to be paid in lieu?`}
-          confirmText="Request Payment"
-          cancelText="Cancel"
-          onConfirm={handlePaidInLieuConfirm}
-          onCancel={closeModal}
-          isLoading={actionInProgress === selectedRequest.id}
-          destructive={false}
-        />
-      )}
     </View>
   );
 }

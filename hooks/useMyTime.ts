@@ -1,10 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { differenceInYears } from "date-fns";
 import { supabase } from "@/lib/supabase";
 import { getCurrentMember } from "@/lib/supabase";
 import { normalizeDate } from "@/utils/date";
 import { useAuth } from "@/contexts/AuthContext";
-import { SupabaseClient } from "@supabase/supabase-js";
+import { useTimeStore } from "@/store/timeStore";
+import { useCalendarAllotments } from "@/hooks/useCalendarAllotments";
+import { useCalendarStore } from "@/store/calendarStore";
 
 // Types for the hook
 export interface TimeStats {
@@ -57,19 +59,20 @@ export interface TimeOffRequest {
 }
 
 export function useMyTime() {
-  const [timeStats, setTimeStats] = useState<TimeStats>({
-    total: { pld: 0, sdv: 0 },
-    available: { pld: 0, sdv: 0 },
-    requested: { pld: 0, sdv: 0 },
-    waitlisted: { pld: 0, sdv: 0 },
-    approved: { pld: 0, sdv: 0 },
-    paidInLieu: { pld: 0, sdv: 0 },
-  });
-
-  const [timeOffRequests, setTimeOffRequests] = useState<TimeOffRequest[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
+  const {
+    timeStats,
+    timeOffRequests,
+    isLoading,
+    error,
+    setTimeStats,
+    setTimeOffRequests,
+    setIsLoading,
+    setError,
+    refresh: triggerRefresh,
+  } = useTimeStore();
+  const { refresh: refreshAllotments } = useCalendarAllotments(new Date());
+  const { fetchAllotments } = useCalendarStore();
 
   // Calculate PLD entitlement based on years of service
   const calculatePldEntitlement = (hireDate: string | null, override: number | null): number => {
@@ -79,7 +82,7 @@ export function useMyTime() {
 
     if (!hireDate) return 0;
 
-    const yearsOfService = differenceInYears(normalizeDate(new Date()), normalizeDate(hireDate));
+    const yearsOfService = differenceInYears(new Date(), new Date(hireDate));
 
     if (yearsOfService < 1) return 0;
     if (yearsOfService < 3) return 5;
@@ -105,9 +108,7 @@ export function useMyTime() {
       // Calculate total PLD entitlement
       const totalPld = calculatePldEntitlement(member.company_hire_date, member.pld_override);
 
-      // Get SDV entitlement from member record (default to 0 if not set)
-      // This value is managed by division admins and represents the number of
-      // single day vacations (max 12, 6 per week for 2 weeks) allocated to the member
+      // Get SDV entitlement from member record
       const totalSdv = member.sdv_entitlement || 0;
 
       // Get all requests for the current user
@@ -167,7 +168,7 @@ export function useMyTime() {
       const availablePld = totalPld - approvedPld - requestedPld - waitlistedPld;
       const availableSdv = totalSdv - approvedSdv - requestedSdv - waitlistedSdv;
 
-      // Set state
+      // Update store
       setTimeStats({
         total: { pld: totalPld, sdv: totalSdv },
         available: { pld: Math.max(0, availablePld), sdv: Math.max(0, availableSdv) },
@@ -189,7 +190,11 @@ export function useMyTime() {
   // Cancel a request
   const cancelRequest = async (requestId: string) => {
     try {
-      const { data: request } = await supabase.from("pld_sdv_requests").select("status").eq("id", requestId).single();
+      const { data: request } = await supabase
+        .from("pld_sdv_requests")
+        .select("status, request_date")
+        .eq("id", requestId)
+        .single();
 
       if (!request) {
         throw new Error("Request not found");
@@ -219,8 +224,19 @@ export function useMyTime() {
         if (error) throw error;
       }
 
-      // Refresh time data
+      // Since realtime isn't working, we need to refresh both manually
+      // but we'll do it in sequence to avoid multiple UI updates
       await loadTimeData();
+
+      // Get the request date and fetch allotments for that month
+      const requestDate = new Date(request.request_date);
+
+      // Get the member's division
+      const member = await getCurrentMember();
+      if (member?.division) {
+        await fetchAllotments(requestDate, member.division);
+      }
+
       return true;
     } catch (err: any) {
       console.error("Error cancelling request:", err);
@@ -246,7 +262,7 @@ export function useMyTime() {
     }
   };
 
-  // Load time data on mount
+  // Load time data on mount and when refresh is triggered
   useEffect(() => {
     loadTimeData();
   }, []);

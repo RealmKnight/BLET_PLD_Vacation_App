@@ -1,45 +1,101 @@
-import React from "react";
-import { StyleSheet, ScrollView, useWindowDimensions, Platform, View, RefreshControl } from "react-native";
+import React, { useState } from "react";
+import { StyleSheet, useWindowDimensions, Platform, View, RefreshControl, Alert, FlatList } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Image } from "expo-image";
 
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { AppHeader } from "@/components/AppHeader";
-import { AuthHeader } from "@/components/AuthHeader";
 import { TimeStats } from "@/components/my-time/TimeStats";
 import { TimeOffRequestsList } from "@/components/my-time/TimeOffRequestsList";
-import { useMyTime } from "@/hooks/useMyTime";
-import { useCalendarAllotments } from "@/hooks/useCalendarAllotments";
+import { ConfirmationModal } from "@/components/my-time/ConfirmationModal";
+import { useMyTime, TimeOffRequest } from "@/hooks/useMyTime";
+import { format } from "date-fns";
+import { parseYMDDate } from "@/utils/date";
+
+// Define sections for the FlatList
+type Section = {
+  id: string;
+  type: "header" | "stats" | "requests" | "waitlisted";
+};
+
+const sections: Section[] = [
+  { id: "header", type: "header" },
+  { id: "stats", type: "stats" },
+  { id: "requests", type: "requests" },
+  { id: "waitlisted", type: "waitlisted" },
+];
 
 export default function MyTimeScreen() {
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
 
   const { timeStats, timeOffRequests, isLoading, error, cancelRequest, requestPaidInLieu, refresh } = useMyTime();
-  const { refresh: refreshAllotments } = useCalendarAllotments(new Date());
+  const [selectedRequest, setSelectedRequest] = useState<TimeOffRequest | null>(null);
+  const [modalType, setModalType] = useState<"cancel" | "paidInLieu" | null>(null);
+  const [actionInProgress, setActionInProgress] = useState<string | null>(null);
 
-  // Handle successful cancellation
-  const handleCancelRequest = async (requestId: string) => {
-    const success = await cancelRequest(requestId);
-    if (success) {
-      // Refresh both time data and calendar allotments
-      await Promise.all([refresh(), refreshAllotments()]);
-    }
-    return success;
+  // Format date function using our utility
+  const formatDate = (dateString: string) => {
+    const normalizedDate = parseYMDDate(dateString);
+    return format(normalizedDate, "MMM d, yyyy");
   };
 
-  return (
-    <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
-      <ThemedView style={styles.container}>
-        <AppHeader />
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={isLoading} onRefresh={refresh} tintColor="#BAC42A" />}
-        >
-          <ThemedView style={[styles.content, isMobile && styles.contentMobile]}>
+  // Handle cancel confirmation
+  const handleCancelConfirm = async () => {
+    if (!selectedRequest) return;
+
+    setActionInProgress(selectedRequest.id);
+    const success = await cancelRequest(selectedRequest.id);
+    setActionInProgress(null);
+
+    if (!success) {
+      Alert.alert("Error", "Failed to cancel request. Please try again.");
+    }
+
+    closeModal();
+  };
+
+  // Handle paid in lieu confirmation
+  const handlePaidInLieuConfirm = async () => {
+    if (!selectedRequest) return;
+
+    setActionInProgress(selectedRequest.id);
+    const success = await requestPaidInLieu(selectedRequest.id);
+    setActionInProgress(null);
+
+    if (!success) {
+      Alert.alert("Error", "Failed to request paid in lieu. Please try again.");
+    } else {
+      Alert.alert("Success", "Your request has been submitted for payment in lieu.");
+    }
+
+    closeModal();
+  };
+
+  // Close modal
+  const closeModal = () => {
+    setModalType(null);
+    setSelectedRequest(null);
+  };
+
+  // Open cancel confirmation modal
+  const openCancelConfirmation = (request: TimeOffRequest) => {
+    setSelectedRequest(request);
+    setModalType("cancel");
+  };
+
+  // Open paid in lieu confirmation modal
+  const openPaidInLieuConfirmation = (request: TimeOffRequest) => {
+    setSelectedRequest(request);
+    setModalType("paidInLieu");
+  };
+
+  const renderSection = ({ item }: { item: Section }) => {
+    switch (item.type) {
+      case "header":
+        return (
+          <>
             <View style={styles.headerContainer}>
               <View style={styles.header}>
                 <Image source={require("@/assets/images/BLETblackgold.png")} style={styles.logo} contentFit="contain" />
@@ -55,29 +111,86 @@ export default function MyTimeScreen() {
                 <ThemedText style={styles.errorText}>{error}</ThemedText>
               </View>
             )}
+          </>
+        );
 
-            {/* Time Statistics */}
-            <TimeStats stats={timeStats} isLoading={isLoading} onRequestPaidInLieu={requestPaidInLieu} />
+      case "stats":
+        return <TimeStats stats={timeStats} isLoading={isLoading} onRequestPaidInLieu={requestPaidInLieu} />;
 
-            {/* Time Off Requests */}
-            <TimeOffRequestsList
-              requests={timeOffRequests}
-              onCancel={handleCancelRequest}
-              onRequestPaidInLieu={requestPaidInLieu}
-              isLoading={isLoading}
-              showWaitlisted={false}
-            />
+      case "requests":
+        return (
+          <TimeOffRequestsList
+            requests={timeOffRequests}
+            onCancelRequest={openCancelConfirmation}
+            onRequestPaidInLieu={openPaidInLieuConfirmation}
+            isLoading={isLoading}
+            showWaitlisted={false}
+            actionInProgress={actionInProgress}
+          />
+        );
 
-            {/* Waitlisted Requests */}
-            <TimeOffRequestsList
-              requests={timeOffRequests}
-              onCancel={handleCancelRequest}
-              onRequestPaidInLieu={requestPaidInLieu}
-              isLoading={isLoading}
-              showWaitlisted={true}
-            />
-          </ThemedView>
-        </ScrollView>
+      case "waitlisted":
+        return (
+          <TimeOffRequestsList
+            requests={timeOffRequests}
+            onCancelRequest={openCancelConfirmation}
+            onRequestPaidInLieu={openPaidInLieuConfirmation}
+            isLoading={isLoading}
+            showWaitlisted={true}
+            actionInProgress={actionInProgress}
+          />
+        );
+
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
+      <ThemedView style={styles.container}>
+        <AppHeader />
+        <FlatList
+          data={sections}
+          renderItem={renderSection}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={[styles.content, isMobile && styles.contentMobile]}
+          showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={isLoading} onRefresh={refresh} tintColor="#BAC42A" />}
+        />
+
+        {/* Confirmation Modals */}
+        {selectedRequest && modalType === "cancel" && (
+          <ConfirmationModal
+            visible={true}
+            title="Cancel Request"
+            message={`Are you sure you want to cancel your ${selectedRequest.leaveType} request for ${formatDate(
+              selectedRequest.requestDate
+            )}?`}
+            confirmText="Cancel Request"
+            cancelText="Keep Request"
+            onConfirm={handleCancelConfirm}
+            onCancel={closeModal}
+            isLoading={actionInProgress === selectedRequest.id}
+            destructive={true}
+          />
+        )}
+
+        {selectedRequest && modalType === "paidInLieu" && (
+          <ConfirmationModal
+            visible={true}
+            title="Request Paid in Lieu"
+            message={`Are you sure you want to request ${selectedRequest.leaveType} for ${formatDate(
+              selectedRequest.requestDate
+            )} to be paid in lieu?`}
+            confirmText="Request Payment"
+            cancelText="Cancel"
+            onConfirm={handlePaidInLieuConfirm}
+            onCancel={closeModal}
+            isLoading={actionInProgress === selectedRequest.id}
+            destructive={false}
+          />
+        )}
       </ThemedView>
     </SafeAreaView>
   );

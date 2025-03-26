@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { View, Text, Modal, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Alert } from "react-native";
 import { format, addDays, addMonths, isBefore, isAfter, startOfDay, parseISO } from "date-fns";
 import { supabase } from "@/lib/supabase";
@@ -6,20 +6,39 @@ import { useTimeOffRequests } from "@/hooks/useTimeOffRequests";
 import { useMyTime } from "@/hooks/useMyTime";
 import { getCurrentMember } from "@/lib/supabase";
 import { useCalendarAllotments } from "@/hooks/useCalendarAllotments";
+import { useTimeStore } from "@/store/timeStore";
+import { formatDateToYMD } from "@/utils/date";
+import { Database } from "@/types/supabase";
+import { useFocusEffect } from "@react-navigation/native";
 
 // Define types for allocation data
 type MemberRequest = {
   id: string;
   first_name: string | null;
   last_name: string | null;
-  leave_type: "PLD" | "SDV";
-  status: "pending" | "approved" | "denied" | "waitlisted" | "cancellation_pending" | "cancelled";
+  leave_type: Database["public"]["Enums"]["leave_type"];
+  status: Database["public"]["Enums"]["pld_sdv_status"];
 };
 
-type AllocationSlot = {
+interface AllocationSlot {
   position: number;
   member: MemberRequest | null;
-};
+}
+
+interface RequestData {
+  id: string;
+  leave_type: Database["public"]["Enums"]["leave_type"];
+  status: Database["public"]["Enums"]["pld_sdv_status"];
+  member_id: string;
+  members: {
+    id: string;
+    first_name: string | null;
+    last_name: string | null;
+    division: string | null;
+  };
+}
+
+type Member = Database["public"]["Tables"]["members"]["Row"];
 
 interface RequestModalProps {
   visible: boolean;
@@ -32,191 +51,68 @@ interface RequestModalProps {
 export function RequestModal({ visible, date, division, onClose, onSubmit }: RequestModalProps) {
   const [requestType, setRequestType] = useState<"PLD" | "SDV">("PLD");
   const [allocations, setAllocations] = useState<AllocationSlot[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [maxAllotment, setMaxAllotment] = useState(6); // Default to 6 until we fetch the real value
+  const [isLoading, setIsLoading] = useState(false);
+  const [maxAllotment, setMaxAllotment] = useState(6);
   const [error, setError] = useState<string | null>(null);
   const [existingRequest, setExistingRequest] = useState<{ type: "PLD" | "SDV"; status: string } | null>(null);
+  const [isFetching, setIsFetching] = useState(false);
 
-  const { timeStats } = useMyTime();
+  const { timeStats } = useTimeStore();
   const { submitRequest, isSubmitting } = useTimeOffRequests();
   const { refresh: refreshAllotments } = useCalendarAllotments(date || new Date());
 
-  // Calculate the allowed date range
-  const dateRanges = useMemo(() => {
-    const today = startOfDay(new Date());
-    // Set time to noon to avoid timezone issues
-    today.setHours(12, 0, 0, 0);
+  // Memoize date-related values
+  const normalizedDate = useMemo(() => {
+    if (!date) return null;
+    const normalized = new Date(date);
+    normalized.setHours(12, 0, 0, 0);
+    return normalized;
+  }, [date]);
 
-    return {
-      minAllowedDate: addDays(today, 2), // Min: current date + 2 days (48 hours)
-      maxAllowedDate: addMonths(today, 6), // Max: current date + 6 months
-    };
-  }, []);
+  const formattedDate = useMemo(() => {
+    return normalizedDate ? formatDateToYMD(normalizedDate) : null;
+  }, [normalizedDate]);
 
-  // Check if the date is eligible for requests
+  // Check if the date is eligible for requests - memoized
   const dateStatus = useMemo(() => {
-    if (!date) return { isEligible: false, isTooEarly: false, isTooLate: false };
+    if (!normalizedDate) return { isEligible: false, isTooEarly: false, isTooLate: false };
 
-    // Make a copy of date to avoid modifying the original
-    const normalizedDate = new Date(date);
-    // Set time to noon to avoid timezone issues
-    normalizedDate.setHours(12, 0, 0, 0);
+    const today = startOfDay(new Date());
+    today.setHours(12, 0, 0, 0);
+    const minAllowedDate = addDays(today, 2);
+    const maxAllowedDate = addMonths(today, 6);
 
-    const isTooEarly = isBefore(normalizedDate, dateRanges.minAllowedDate);
-    const isTooLate = isAfter(normalizedDate, dateRanges.maxAllowedDate);
+    const isTooEarly = isBefore(normalizedDate, minAllowedDate);
+    const isTooLate = isAfter(normalizedDate, maxAllowedDate);
     const isEligible = !isTooEarly && !isTooLate;
 
     return { isEligible, isTooEarly, isTooLate };
-  }, [date, dateRanges]);
+  }, [normalizedDate]);
 
-  // Check if user can submit request
+  // Check if user can submit request - memoized
   const canSubmitRequest = useMemo(() => {
     if (!date || !dateStatus.isEligible || existingRequest) return false;
 
-    // Check if there are available slots
     const currentAllocations = allocations.filter((a) => a.member).length;
     if (currentAllocations >= maxAllotment) {
       return false;
     }
 
-    // Check if user has available days
-    if (requestType === "PLD") {
-      return timeStats.available.pld > 0;
-    } else {
-      return timeStats.available.sdv > 0;
-    }
+    return requestType === "PLD" ? timeStats.available.pld > 0 : timeStats.available.sdv > 0;
   }, [date, dateStatus.isEligible, allocations, maxAllotment, requestType, timeStats, existingRequest]);
 
-  // Load allocation and requests data for the selected date
-  const fetchAllocations = async () => {
-    if (!date || !division || !visible) return;
+  // Memoize the onClose callback
+  const memoizedOnClose = useCallback(() => {
+    onClose();
+  }, [onClose]);
 
-    setLoading(true);
-    setError(null);
-    setExistingRequest(null);
+  // Memoize the refresh function
+  const memoizedRefresh = useCallback(async () => {
+    await refreshAllotments();
+  }, [refreshAllotments]);
 
-    try {
-      // Ensure date is normalized for consistent formatting
-      const normalizedDate = new Date(date);
-      normalizedDate.setHours(12, 0, 0, 0);
-      const formattedDate = format(normalizedDate, "yyyy-MM-dd");
-
-      // Get current member
-      const member = await getCurrentMember();
-      if (!member?.id) {
-        throw new Error("Unable to load member data");
-      }
-
-      // Check for existing requests for this date
-      const { data: existingRequests, error: checkError } = await supabase
-        .from("pld_sdv_requests")
-        .select("leave_type, status")
-        .eq("member_id", member.id)
-        .eq("request_date", formattedDate)
-        .in("status", ["pending", "approved", "waitlisted", "cancellation_pending"]);
-
-      if (checkError) throw checkError;
-
-      if (existingRequests && existingRequests.length > 0) {
-        setExistingRequest({
-          type: existingRequests[0].leave_type,
-          status: existingRequests[0].status,
-        });
-      }
-
-      // 1. Get max allotment for the date
-      const { data: allotmentData, error: allotmentError } = await supabase
-        .from("pld_sdv_allotments")
-        .select("max_allotment")
-        .eq("date", formattedDate)
-        .eq("division", division)
-        .single();
-
-      if (allotmentError && allotmentError.code !== "PGRST116") {
-        console.error("Error fetching allotment:", allotmentError);
-        setError("Failed to load allotment data.");
-      }
-
-      const slots = allotmentData?.max_allotment || maxAllotment;
-      setMaxAllotment(slots);
-
-      // 2. Get existing requests for this date (both pending and approved)
-      const { data: requestsData, error: requestsError } = await supabase
-        .from("pld_sdv_requests")
-        .select(
-          `
-          id, 
-          leave_type,
-          member_id,
-          status
-        `
-        )
-        .eq("request_date", formattedDate)
-        .eq("division", division)
-        .in("status", ["pending", "approved"])
-        .order("requested_at", { ascending: true });
-
-      if (requestsError) {
-        console.error("Error fetching requests:", requestsError);
-        setError("Failed to load request data.");
-      }
-
-      // 3. Get member info for each request
-      const memberRequests = [];
-      if (requestsData && requestsData.length > 0) {
-        for (const request of requestsData) {
-          const { data: memberData, error: memberError } = await supabase
-            .from("members")
-            .select("first_name, last_name")
-            .eq("id", request.member_id)
-            .single();
-
-          if (memberError) {
-            console.error("Error fetching member:", memberError);
-            continue;
-          }
-
-          memberRequests.push({
-            id: request.member_id,
-            first_name: memberData?.first_name || "Unknown",
-            last_name: memberData?.last_name || "Member",
-            leave_type: request.leave_type,
-            status: request.status,
-          });
-        }
-      }
-
-      // 4. Build the allocations list
-      const allocationsList: AllocationSlot[] = [];
-      for (let i = 0; i < slots; i++) {
-        if (memberRequests && i < memberRequests.length) {
-          allocationsList.push({
-            position: i + 1,
-            member: memberRequests[i],
-          });
-        } else {
-          // Empty slot
-          allocationsList.push({
-            position: i + 1,
-            member: null,
-          });
-        }
-      }
-
-      setAllocations(allocationsList);
-    } catch (error) {
-      console.error("Error in fetchAllocations:", error);
-      setError("An error occurred while loading the data.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchAllocations();
-  }, [date, division, visible]);
-
-  const handleSubmit = async () => {
+  // Memoize the submit handler
+  const handleSubmit = useCallback(async () => {
     if (!canSubmitRequest || !date) return;
 
     try {
@@ -224,12 +120,11 @@ export function RequestModal({ visible, date, division, onClose, onSubmit }: Req
       const success = await submitRequest(date, requestType, division);
 
       if (success) {
-        // Refresh allotments after successful submission
-        await refreshAllotments();
-        handleClose();
+        await memoizedRefresh();
         if (onSubmit) {
           onSubmit(requestType);
         }
+        memoizedOnClose();
       }
     } catch (error) {
       if (error instanceof Error) {
@@ -238,26 +133,174 @@ export function RequestModal({ visible, date, division, onClose, onSubmit }: Req
         setError("An unexpected error occurred");
       }
     }
-  };
+  }, [canSubmitRequest, date, requestType, division, submitRequest, memoizedRefresh, onSubmit, memoizedOnClose]);
 
-  const handleClose = async () => {
-    // Refresh allotments before closing to ensure calendar is up to date
-    await refreshAllotments();
-    onClose();
-  };
-
-  // If date isn't eligible, close the modal
-  React.useEffect(() => {
-    if (visible && date && !dateStatus.isEligible) {
-      onClose();
+  // Reset state when modal closes
+  useEffect(() => {
+    if (!visible) {
+      setAllocations([]);
+      setError(null);
+      setExistingRequest(null);
     }
-  }, [visible, date, dateStatus.isEligible, onClose]);
+  }, [visible]);
+
+  // Memoize the fetchAllocations function
+  const fetchAllocations = useCallback(async () => {
+    if (!formattedDate || !division || !dateStatus.isEligible || isLoading) return;
+
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      // Get current member first
+      const member = await getCurrentMember();
+      if (!member?.id) {
+        throw new Error("Unable to load member data");
+      }
+
+      // Optimize the query to get both requests and allotment in one go
+      const { data: requestsData, error: requestsError } = await supabase
+        .from("pld_sdv_requests")
+        .select(
+          `
+          id,
+          leave_type,
+          status,
+          member_id,
+          members!inner (
+            id,
+            first_name,
+            last_name,
+            division
+          )
+        `
+        )
+        .eq("request_date", formattedDate)
+        .eq("division", division)
+        .or(
+          `status.in.(pending,approved),and(member_id.eq.${member.id},status.in.(pending,approved,waitlisted,cancellation_pending))`
+        );
+
+      if (requestsError) throw requestsError;
+
+      // Get max allotment
+      const { data: allotmentData, error: allotmentError } = await supabase
+        .from("pld_sdv_allotments")
+        .select("max_allotment")
+        .eq("date", formattedDate)
+        .eq("division", division)
+        .single();
+
+      if (allotmentError) throw allotmentError;
+
+      // Check for existing requests - use proper typing
+      const existingReq = requestsData?.find(
+        (req) =>
+          req.member_id === member.id &&
+          ["pending", "approved", "waitlisted", "cancellation_pending"].includes(req.status)
+      );
+
+      const newExistingRequest = existingReq
+        ? {
+            type: existingReq.leave_type,
+            status: existingReq.status,
+          }
+        : null;
+
+      // Set max allotment
+      const slots = allotmentData?.max_allotment || maxAllotment;
+
+      // Process requests and build allocation list
+      const allocationsList: AllocationSlot[] = [];
+
+      // Add existing requests (only pending and approved)
+      if (requestsData) {
+        requestsData
+          .filter(
+            (request) =>
+              ["pending", "approved"].includes(request.status) &&
+              request.members !== null &&
+              request.members.id !== null
+          )
+          .forEach((request) => {
+            if (request.members && request.members.id) {
+              // TypeScript guard
+              allocationsList.push({
+                position: allocationsList.length + 1,
+                member: {
+                  id: request.members.id,
+                  first_name: request.members.first_name ?? "",
+                  last_name: request.members.last_name ?? "",
+                  leave_type: request.leave_type,
+                  status: request.status,
+                },
+              });
+            }
+          });
+      }
+
+      // Fill remaining slots
+      for (let i = allocationsList.length; i < slots; i++) {
+        allocationsList.push({
+          position: i + 1,
+          member: null,
+        });
+      }
+
+      // Batch state updates
+      setAllocations(allocationsList);
+      setMaxAllotment(slots);
+      setExistingRequest(newExistingRequest);
+    } catch (error) {
+      console.error("Error in fetchAllocations:", error);
+      setError("An error occurred while loading the data.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [formattedDate, division, dateStatus.isEligible, isLoading, maxAllotment]);
+
+  // Only fetch when modal becomes visible and we have valid data
+  useFocusEffect(
+    useCallback(() => {
+      let isMounted = true;
+
+      const loadData = async () => {
+        if (!visible || !formattedDate || !dateStatus.isEligible || isFetching) return;
+
+        try {
+          setIsFetching(true);
+          await fetchAllocations();
+        } catch (error) {
+          if (isMounted) {
+            setError("Failed to load allocations");
+          }
+        } finally {
+          if (isMounted) {
+            setIsFetching(false);
+          }
+        }
+      };
+
+      loadData();
+
+      return () => {
+        isMounted = false;
+      };
+    }, [visible, formattedDate, dateStatus.isEligible, fetchAllocations, isFetching])
+  );
+
+  // Handle ineligible dates
+  useEffect(() => {
+    if (visible && date && !dateStatus.isEligible) {
+      memoizedOnClose();
+    }
+  }, [visible, date, dateStatus.isEligible, memoizedOnClose]);
 
   if (!date) return null;
 
   // Render the allocation list
   const renderAllocationList = () => {
-    if (loading) {
+    if (isLoading) {
       return (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="small" color="#BAC42A" />
@@ -328,7 +371,12 @@ export function RequestModal({ visible, date, division, onClose, onSubmit }: Req
   };
 
   return (
-    <Modal visible={visible && dateStatus.isEligible} transparent animationType="slide" onRequestClose={handleClose}>
+    <Modal
+      visible={visible && dateStatus.isEligible}
+      transparent
+      animationType="slide"
+      onRequestClose={memoizedOnClose}
+    >
       <View style={styles.overlay}>
         <View style={styles.container}>
           <Text style={styles.title}>Request Leave for {format(date, "EEEE, MMMM d, yyyy")}</Text>
@@ -382,7 +430,7 @@ export function RequestModal({ visible, date, division, onClose, onSubmit }: Req
           </ScrollView>
 
           <View style={styles.buttonContainer}>
-            <TouchableOpacity style={styles.cancelButton} onPress={handleClose} disabled={isSubmitting}>
+            <TouchableOpacity style={styles.cancelButton} onPress={memoizedOnClose} disabled={isSubmitting}>
               <Text style={[styles.cancelButtonText, isSubmitting && styles.disabledButtonText]}>Cancel</Text>
             </TouchableOpacity>
 
